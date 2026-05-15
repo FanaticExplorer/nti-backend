@@ -1,0 +1,26 @@
+services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: nti
+      POSTGRES_PASSWORD: ntipassword
+      POSTGRES_DB: nti_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  app:
+    build: .
+    depends_on:
+      - db
+    ports:
+      - "8000:8000"
+    volumes:
+      - uploads:/app/uploads
+    env_file:
+      - .env
+
+volumes:
+  pgdata:
+  uploads:
