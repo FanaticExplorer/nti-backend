@@ -19,18 +19,21 @@ _fm = FastMail(_mail_conf)
 
 
 async def _send(to: str, subject: str, body: str) -> None:
-    """Send an email. Falls back to console if no SMTP is configured."""
+    """Send an email. Falls back to console if no SMTP is configured or on failure."""
     if not settings.MAIL_USERNAME:
         print(f"[EMAIL] To: {to} | Subject: {subject}")
         return
 
-    message = MessageSchema(
-        subject=subject,
-        recipients=[NameEmail("", to)],
-        body=body,
-        subtype=MessageType.html,
-    )
-    await _fm.send_message(message)
+    try:
+        message = MessageSchema(
+            subject=subject,
+            recipients=[NameEmail("", to)],
+            body=body,
+            subtype=MessageType.html,
+        )
+        await _fm.send_message(message)
+    except Exception:
+        print(f"[EMAIL] FAILED (console fallback) To: {to} | Subject: {subject}")
 
 
 async def send_welcome_email(to: str) -> None:
