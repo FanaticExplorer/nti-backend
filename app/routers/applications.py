@@ -20,6 +20,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.database import get_db
 from app.dependencies import get_current_user, require_role
@@ -33,6 +34,7 @@ from app.models.team import Team, team_members
 from app.models.user import User
 from app.schemas.application import (
     ApplicationCreate,
+    ApplicationDetailOut,
     ApplicationOut,
     ApplicationStatusHistoryOut,
     ApplicationStatusUpdate,
@@ -178,7 +180,7 @@ async def list_applications(
     }
 
 
-@router.get("/{application_id}", response_model=ApplicationOut)
+@router.get("/{application_id}", response_model=ApplicationDetailOut)
 async def get_application(
     application_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
@@ -187,18 +189,33 @@ async def get_application(
     """
     Retrieve a single application by ID.
 
+    Includes nested ``call``, ``team``, and ``applicant`` objects.
+
     **Access control**:
     - ``nti_admin``, ``evaluator``, ``mentor`` can view any application
     - The original applicant can view their own application
     - All other roles receive a 403
     """
-    app = await _get_app(application_id, db)
+    result = await db.execute(
+        select(Application)
+        .options(
+            selectinload(Application.call),
+            selectinload(Application.team),
+            selectinload(Application.applicant),
+        )
+        .where(Application.id == application_id)
+    )
+    app = result.scalar_one_or_none()
+    if not app:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Application not found"
+        )
     allowed = ("nti_admin", "evaluator", "mentor")
     if current_user.role not in allowed and app.applicant_id != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
         )
-    return app
+    return ApplicationDetailOut.model_validate(app)
 
 
 @router.put("/{application_id}", response_model=ApplicationOut)

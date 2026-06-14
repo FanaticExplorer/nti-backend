@@ -4,6 +4,10 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
+from app.schemas.auth import UserOut
+from app.schemas.call import CallOut
+from app.schemas.team import TeamOut
+
 
 class ApplicationCreate(BaseModel):
     call_id: UUID
@@ -33,6 +37,12 @@ class ApplicationOut(BaseModel):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class ApplicationDetailOut(ApplicationOut):
+    call: Optional["CallOut"] = None
+    team: Optional["TeamOut"] = None
+    applicant: Optional["UserOut"] = None
 
 
 class ApplicationStatusHistoryOut(BaseModel):
