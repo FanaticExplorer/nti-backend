@@ -125,7 +125,11 @@ async def login(
     access_token = create_access_token(token_data)
     refresh_token = create_refresh_token(token_data)
 
-    return TokenResponse(access_token=access_token, refresh_token=refresh_token)
+    return TokenResponse(
+        access_token=access_token,
+        refresh_token=refresh_token,
+        user=UserOut.model_validate(user),
+    )
 
 
 @router.post("/refresh", response_model=TokenResponse)
@@ -161,7 +165,11 @@ async def refresh(
     access_token = create_access_token(token_data)
     refresh_token_new = create_refresh_token(token_data)
 
-    return TokenResponse(access_token=access_token, refresh_token=refresh_token_new)
+    return TokenResponse(
+        access_token=access_token,
+        refresh_token=refresh_token_new,
+        user=UserOut.model_validate(user),
+    )
 
 
 @router.post("/verify-email")
