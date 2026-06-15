@@ -171,6 +171,13 @@ async def invite_member(
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
         )
 
+    # Only students and team leaders can be invited
+    if invited.role not in ("student", "team_leader"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Can only invite users with student or team_leader role",
+        )
+
     # Check if already a member
     existing = await db.execute(
         select(team_members).where(

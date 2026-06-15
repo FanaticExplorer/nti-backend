@@ -109,7 +109,7 @@ async def get_organization(
             status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found"
         )
 
-    # Access control: firm users can only see their own org, nti_admin/mentor can see all
+    # Access control: firm users can only see their own org, nti_admin/mentor/super_admin can see all
     if current_user.role == "firm":
         member_check = await db.execute(
             select(org_members).where(
@@ -121,6 +121,10 @@ async def get_organization(
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
             )
+    elif current_user.role not in ("nti_admin", "super_admin", "mentor"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
+        )
 
     return org
 

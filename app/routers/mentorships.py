@@ -57,11 +57,17 @@ async def assign_mentor(
             status_code=status.HTTP_404_NOT_FOUND, detail="Application not found"
         )
 
-    # Check mentor exists
+    # Check mentor exists and has mentor role
     mentor_result = await db.execute(select(User).where(User.id == body.mentor_id))
-    if not mentor_result.scalar_one_or_none():
+    mentor = mentor_result.scalar_one_or_none()
+    if not mentor:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Mentor not found"
+        )
+    if mentor.role != "mentor":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Assigned user does not have mentor role",
         )
 
     mentorship = Mentorship(
