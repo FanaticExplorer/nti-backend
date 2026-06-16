@@ -35,7 +35,7 @@ from app.schemas.auth import (
     UserRegister,
     VerifyEmailRequest,
 )
-from app.utils.email import send_welcome_email
+from app.utils.email import send_password_reset, send_welcome_email
 from app.utils.security import (
     create_access_token,
     create_refresh_token,
@@ -216,6 +216,7 @@ async def verify_email(
 async def forgot_password(
     request: Request,
     body: ForgotPasswordRequest,
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -233,8 +234,8 @@ async def forgot_password(
     # Always return success to avoid email enumeration
     if user:
         token_data = {"sub": str(user.id), "purpose": "password_reset"}
-        _ = create_access_token(token_data)
-        # In production: send email with token
+        token = create_access_token(token_data)
+        background_tasks.add_task(send_password_reset, user.email, token)
 
     return {"detail": "If the email exists, a password reset link has been sent"}
 
