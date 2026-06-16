@@ -43,7 +43,7 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     is_email_verified: Mapped[bool] = mapped_column(Boolean, default=False)
     gdpr_consent: Mapped[bool] = mapped_column(Boolean, default=False)
-    gdpr_consent_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    gdpr_consent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )

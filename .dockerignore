@@ -1,9 +1,36 @@
+# Virtual envs
 .venv
+.venv-wsl
 __pycache__
 *.pyc
+.pytest_cache
+
+# Git
 .git
 .gitignore
+
+# Secrets & env
 .env
+.env.example
+
+# Tests
+tests/
+
+# Uploads (volume-mounted at runtime)
 uploads/*
 !uploads/.gitkeep
+
+# Docker & infra
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Docs & meta
 *.md
+.python-version
+
+# Editor/IDE
+.vscode
+.idea
+*.swp
+*.swo
