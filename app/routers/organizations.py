@@ -18,7 +18,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.dependencies import get_current_user, require_role
+from app.dependencies import require_role
 from app.models.organization import Organization, org_members
 from app.models.user import User
 from app.schemas.organization import (
@@ -91,7 +91,7 @@ async def list_organizations(
 @router.get("/{org_id}", response_model=OrganizationOut)
 async def get_organization(
     org_id: uuid.UUID,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role("firm", "nti_admin", "super_admin", "mentor")),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -109,7 +109,7 @@ async def get_organization(
             status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found"
         )
 
-    # Access control: firm users can only see their own org, nti_admin/mentor/super_admin can see all
+    # Access control: firm users can only see their own org
     if current_user.role == "firm":
         member_check = await db.execute(
             select(org_members).where(
@@ -121,10 +121,6 @@ async def get_organization(
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
             )
-    elif current_user.role not in ("nti_admin", "super_admin", "mentor"):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
-        )
 
     return org
 

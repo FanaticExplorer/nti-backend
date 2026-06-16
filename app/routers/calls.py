@@ -19,7 +19,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.dependencies import get_current_user, require_role
+from app.dependencies import require_role
 from app.models.call import Call
 from app.models.organization import org_members
 from app.models.user import User
@@ -91,7 +91,7 @@ async def get_call(
 @router.post("", response_model=CallOut, status_code=status.HTTP_201_CREATED)
 async def create_call(
     body: CallCreate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role("nti_admin", "super_admin", "firm")),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -105,12 +105,7 @@ async def create_call(
 
     **Access**: ``nti_admin``, ``super_admin``, ``firm``
     """
-    # Access control: nti_admin, super_admin can always create; firm only if they belong to the organization
-    if current_user.role not in ("nti_admin", "super_admin", "firm"):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized"
-        )
-
+    # Access control: nti_admin, super_admin can always create; firm only if they belong to the org
     if current_user.role == "firm":
         if not body.organization_id:
             raise HTTPException(
@@ -141,7 +136,7 @@ async def create_call(
 async def update_call(
     call_id: uuid.UUID,
     body: CallUpdate,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role("nti_admin", "super_admin", "firm")),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -161,16 +156,11 @@ async def update_call(
             status_code=status.HTTP_404_NOT_FOUND, detail="Call not found"
         )
 
-    # Access control
-    if current_user.role not in ("nti_admin", "super_admin"):
-        if current_user.role == "firm" and call.created_by != current_user.id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN, detail="Not your call"
-            )
-        elif current_user.role != "firm":
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN, detail="Not authorized"
-            )
+    # Access control: firm users can only update their own calls
+    if current_user.role == "firm" and call.created_by != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Not your call"
+        )
 
     update_data = body.model_dump(exclude_unset=True)
     for key, value in update_data.items():
