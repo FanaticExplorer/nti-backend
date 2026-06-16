@@ -44,8 +44,9 @@ async def _send(to: str, subject: str, body: str) -> None:
             subtype=MessageType.html,
         )
         await fm.send_message(message)
-    except Exception:
+    except Exception as e:
         print(f"[EMAIL] FAILED (console fallback) To: {to} | Subject: {subject}")
+        print(f"[EMAIL] Error: {e}")
         print(f"[EMAIL] Body: {body}")
 
 

@@ -91,7 +91,11 @@ async def upload_document(
         )
 
     # Validate file extension
-    assert file.filename is not None
+    if file.filename is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File must have a filename",
+        )
     ext = os.path.splitext(file.filename)[1].lower()
     if ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(
@@ -117,7 +121,6 @@ async def upload_document(
     version = (existing.version + 1) if existing else 1
 
     # Save file
-    assert file.filename is not None  # UploadFile always has a filename
     upload_dir = os.path.join(settings.UPLOAD_DIR, str(application_id))
     os.makedirs(upload_dir, exist_ok=True)
     file_path = os.path.join(upload_dir, file.filename)

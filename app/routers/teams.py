@@ -73,6 +73,7 @@ async def create_team(
 
     if current_user.role == "student":
         current_user.role = "team_leader"
+        await db.flush()
 
     await db.commit()
 

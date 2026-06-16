@@ -18,7 +18,7 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -126,9 +126,9 @@ async def get_my_applications(
     )
     apps = result.scalars().all()
     total_result = await db.execute(
-        select(Application).where(Application.applicant_id == current_user.id)
+        select(func.count(Application.id)).where(Application.applicant_id == current_user.id)
     )
-    total = len(total_result.scalars().all())
+    total = total_result.scalar() or 0
     return {
         "items": [ApplicationOut.model_validate(a) for a in apps],
         "total": total,
@@ -165,12 +165,12 @@ async def list_applications(
     result = await db.execute(query)
     apps = result.scalars().all()
 
-    count_query = select(Application)
+    count_query = select(func.count(Application.id))
     if status_filter:
         count_query = count_query.where(Application.status == status_filter)
     if call_id:
         count_query = count_query.where(Application.call_id == call_id)
-    total = len((await db.execute(count_query)).scalars().all())
+    total = (await db.execute(count_query)).scalar() or 0
 
     return {
         "items": [ApplicationOut.model_validate(a) for a in apps],

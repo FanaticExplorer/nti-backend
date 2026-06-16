@@ -14,7 +14,7 @@ Endpoints:
 import uuid
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -77,8 +77,8 @@ async def list_organizations(
     """
     result = await db.execute(select(Organization).offset(skip).limit(limit))
     orgs = result.scalars().all()
-    total_result = await db.execute(select(Organization))
-    total = len(total_result.scalars().all())
+    total_result = await db.execute(select(func.count(Organization.id)))
+    total = total_result.scalar() or 0
 
     return {
         "items": [OrganizationOut.model_validate(o) for o in orgs],
