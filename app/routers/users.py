@@ -13,7 +13,7 @@ requires ``super_admin`` specifically).
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -21,7 +21,7 @@ from app.database import get_db
 from app.dependencies import require_role
 from app.models.user import User
 from app.schemas.user import UserListOut, UserUpdateRole
-from app.services.audit_service import write_audit_log
+from app.services.audit_service import get_client_ip, write_audit_log
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -83,6 +83,7 @@ async def get_user(
 
 @router.patch("/{user_id}/role")
 async def change_user_role(
+    request: Request,
     user_id: uuid.UUID,
     body: UserUpdateRole,
     current_user: User = Depends(require_role("super_admin")),
@@ -113,6 +114,7 @@ async def change_user_role(
         "user",
         str(user.id),
         {"old_role": old_role, "new_role": body.role},
+        ip_address=get_client_ip(request),
     )
 
     return UserListOut.model_validate(user)
@@ -120,6 +122,7 @@ async def change_user_role(
 
 @router.patch("/{user_id}/deactivate")
 async def deactivate_user(
+    request: Request,
     user_id: uuid.UUID,
     current_user: User = Depends(require_role("nti_admin", "super_admin")),
     db: AsyncSession = Depends(get_db),
@@ -148,6 +151,7 @@ async def deactivate_user(
         "user.deactivated",
         "user",
         str(user.id),
+        ip_address=get_client_ip(request),
     )
 
     return UserListOut.model_validate(user)

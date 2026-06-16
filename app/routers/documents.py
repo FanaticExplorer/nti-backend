@@ -15,7 +15,7 @@ Maximum file size is configured via ``settings.MAX_UPLOAD_SIZE_MB``.
 import os
 import uuid
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -27,7 +27,7 @@ from app.models.application import Application
 from app.models.document import Document
 from app.models.user import User
 from app.schemas.document import DocumentOut
-from app.services.audit_service import write_audit_log
+from app.services.audit_service import get_client_ip, write_audit_log
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
@@ -46,6 +46,7 @@ MAX_SIZE = settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024
 
 @router.post("", response_model=DocumentOut, status_code=status.HTTP_201_CREATED)
 async def upload_document(
+    request: Request,
     application_id: uuid.UUID,
     file: UploadFile = File(...),
     current_user: User = Depends(require_role("student", "team_leader")),
@@ -143,6 +144,7 @@ async def upload_document(
         "document",
         str(doc.id),
         {"filename": file.filename, "application_id": str(application_id)},
+        ip_address=get_client_ip(request),
     )
 
     return doc
@@ -191,6 +193,7 @@ async def download_document(
 
 @router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_document(
+    request: Request,
     document_id: uuid.UUID,
     current_user: User = Depends(require_role("student", "team_leader")),
     db: AsyncSession = Depends(get_db),
@@ -244,4 +247,5 @@ async def delete_document(
         "document",
         str(document_id),
         {"filename": doc.filename},
+        ip_address=get_client_ip(request),
     )

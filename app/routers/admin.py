@@ -14,7 +14,7 @@ import io
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -28,7 +28,7 @@ from app.models.organization import Organization
 from app.models.program import Program
 from app.models.team import Team
 from app.models.user import User
-from app.services.audit_service import write_audit_log
+from app.services.audit_service import get_client_ip, write_audit_log
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -198,6 +198,7 @@ async def get_audit_log(
 
 @router.get("/export/applications")
 async def export_applications_csv(
+    request: Request,
     call_id: uuid.UUID | None = Query(None),
     current_user: User = Depends(require_role("nti_admin", "super_admin")),
     db: AsyncSession = Depends(get_db),
@@ -266,6 +267,7 @@ async def export_applications_csv(
         "application",
         "csv_export",
         {"call_id": str(call_id) if call_id else None, "count": len(apps)},
+        ip_address=get_client_ip(request),
     )
 
     return StreamingResponse(

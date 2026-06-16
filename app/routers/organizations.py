@@ -13,7 +13,7 @@ Endpoints:
 
 import uuid
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -26,7 +26,7 @@ from app.schemas.organization import (
     OrganizationCreate,
     OrganizationOut,
 )
-from app.services.audit_service import write_audit_log
+from app.services.audit_service import get_client_ip, write_audit_log
 from app.utils.email import send_organization_approved
 
 router = APIRouter(prefix="/organizations", tags=["organizations"])
@@ -131,6 +131,7 @@ async def get_organization(
 
 @router.patch("/{org_id}/approve")
 async def approve_organization(
+    request: Request,
     org_id: uuid.UUID,
     background_tasks: BackgroundTasks,
     current_user: User = Depends(require_role("nti_admin", "super_admin")),
@@ -160,6 +161,7 @@ async def approve_organization(
         "organization.approved",
         "organization",
         str(org.id),
+        ip_address=get_client_ip(request),
     )
 
     background_tasks.add_task(send_organization_approved, org.contact_email)

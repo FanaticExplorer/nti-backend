@@ -17,7 +17,7 @@ that defines the allowed next status(es) for each current status.
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -40,7 +40,7 @@ from app.schemas.application import (
     ApplicationStatusUpdate,
     ApplicationUpdate,
 )
-from app.services.audit_service import write_audit_log
+from app.services.audit_service import get_client_ip, write_audit_log
 from app.utils.email import send_application_submitted, send_status_change
 
 router = APIRouter(prefix="/applications", tags=["applications"])
@@ -255,6 +255,7 @@ async def update_application(
 
 @router.post("/{application_id}/submit", response_model=ApplicationOut)
 async def submit_application(
+    request: Request,
     application_id: uuid.UUID,
     background_tasks: BackgroundTasks,
     current_user: User = Depends(require_role("student", "team_leader")),
@@ -384,6 +385,7 @@ async def submit_application(
         "application",
         str(app.id),
         {"old_status": old_status, "new_status": "submitted"},
+        ip_address=get_client_ip(request),
     )
 
     # Email applicant
@@ -397,6 +399,7 @@ async def submit_application(
 
 @router.patch("/{application_id}/status", response_model=ApplicationOut)
 async def change_application_status(
+    request: Request,
     application_id: uuid.UUID,
     body: ApplicationStatusUpdate,
     background_tasks: BackgroundTasks,
@@ -447,6 +450,7 @@ async def change_application_status(
         "application",
         str(app.id),
         {"old_status": old_status, "new_status": body.status},
+        ip_address=get_client_ip(request),
     )
 
     # Email applicant

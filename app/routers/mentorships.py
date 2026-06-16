@@ -13,7 +13,7 @@ mentorships, while admins have full visibility.
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -29,13 +29,14 @@ from app.schemas.mentorship import (
     MentorshipLogOut,
     MentorshipOut,
 )
-from app.services.audit_service import write_audit_log
+from app.services.audit_service import get_client_ip, write_audit_log
 
 router = APIRouter(prefix="/mentorships", tags=["mentorships"])
 
 
 @router.post("", response_model=MentorshipOut, status_code=status.HTTP_201_CREATED)
 async def assign_mentor(
+    request: Request,
     body: MentorshipCreate,
     current_user: User = Depends(require_role("nti_admin")),
     db: AsyncSession = Depends(get_db),
@@ -85,6 +86,7 @@ async def assign_mentor(
         "mentorship",
         str(mentorship.id),
         {"application_id": str(body.application_id), "mentor_id": str(body.mentor_id)},
+        ip_address=get_client_ip(request),
     )
 
     return mentorship

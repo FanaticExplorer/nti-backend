@@ -15,7 +15,7 @@ All evaluation actions write audit log entries.
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,13 +25,14 @@ from app.models.application import Application
 from app.models.evaluation import Evaluation
 from app.models.user import User
 from app.schemas.evaluation import EvaluationCreate, EvaluationOut, EvaluationUpdate
-from app.services.audit_service import write_audit_log
+from app.services.audit_service import get_client_ip, write_audit_log
 
 router = APIRouter(prefix="/evaluations", tags=["evaluations"])
 
 
 @router.post("", response_model=EvaluationOut, status_code=status.HTTP_201_CREATED)
 async def create_evaluation(
+    request: Request,
     body: EvaluationCreate,
     current_user: User = Depends(require_role("evaluator")),
     db: AsyncSession = Depends(get_db),
@@ -74,6 +75,7 @@ async def create_evaluation(
         "evaluation",
         str(evaluation.id),
         {"application_id": str(body.application_id)},
+        ip_address=get_client_ip(request),
     )
 
     return evaluation
