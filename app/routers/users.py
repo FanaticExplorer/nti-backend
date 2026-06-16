@@ -14,7 +14,7 @@ requires ``super_admin`` specifically).
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -46,14 +46,14 @@ async def list_users(
     result = await db.execute(query)
     users = result.scalars().all()
 
-    count_query = select(User)
+    count_query = select(func.count(User.id))
     if role:
         count_query = count_query.where(User.role == role)
-    total = (await db.execute(count_query)).scalars().all()
+    total = (await db.execute(count_query)).scalar_one()
 
     return {
         "items": [UserListOut.model_validate(u) for u in users],
-        "total": len(total),
+        "total": total,
         "skip": skip,
         "limit": limit,
     }

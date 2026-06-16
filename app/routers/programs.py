@@ -14,7 +14,7 @@ Program A for team-based incubation, Program B for individual pre-incubation).
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -39,8 +39,8 @@ async def list_programs(
     """
     result = await db.execute(select(Program).offset(skip).limit(limit))
     programs = result.scalars().all()
-    total_result = await db.execute(select(Program))
-    total = len(total_result.scalars().all())
+    total_result = await db.execute(select(func.count(Program.id)))
+    total = total_result.scalar_one()
     return {
         "items": [ProgramOut.model_validate(p) for p in programs],
         "total": total,

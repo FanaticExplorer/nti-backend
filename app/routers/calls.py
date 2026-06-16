@@ -15,7 +15,7 @@ can only update their own calls.
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -48,8 +48,8 @@ async def list_calls(
     result = await db.execute(query)
     calls = result.scalars().all()
 
-    count_query = select(Call).where(Call.status == (status if status else "open"))
-    total = len((await db.execute(count_query)).scalars().all())
+    count_query = select(func.count(Call.id)).where(Call.status == (status if status else "open"))
+    total = (await db.execute(count_query)).scalar_one()
 
     return {
         "items": [CallOut.model_validate(c) for c in calls],
