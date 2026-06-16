@@ -309,7 +309,7 @@ async def submit_application(
     if program and program.type == "A":
         if not app.team_id:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail="Program A requires a team",
             )
 
@@ -322,7 +322,7 @@ async def submit_application(
             members = member_count_result.all()
             if len(members) < 3:
                 raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                     detail="Team must have at least 3 members for Program A",
                 )
 
@@ -334,7 +334,7 @@ async def submit_application(
                 )
                 if not profile_result.scalar_one_or_none():
                     raise HTTPException(
-                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                         detail=f"Team member {member.user_id} has no student profile",
                     )
 
@@ -358,7 +358,7 @@ async def submit_application(
         ]
         if missing:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail=f"Missing required documents for Program A: {', '.join(missing)}",
             )
 
@@ -424,7 +424,7 @@ async def change_application_status(
     allowed = VALID_TRANSITIONS.get(old_status, [])
     if body.status not in allowed:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=f"Cannot transition from '{old_status}' to '{body.status}'. Allowed: {allowed}",
         )
 

@@ -196,7 +196,7 @@ async def change_call_status(
     allowed = VALID_TRANSITIONS.get(call.status, [])
     if body.status not in allowed:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=f"Cannot transition from '{call.status}' to '{body.status}'. Allowed: {allowed}",
         )
 

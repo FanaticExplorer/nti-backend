@@ -14,7 +14,7 @@ forgot-password) via ``slowapi``.
 """
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from slowapi import Limiter
@@ -80,7 +80,7 @@ async def register(
         full_name=body.full_name,
         role=body.role,
         gdpr_consent=body.gdpr_consent,
-        gdpr_consent_at=datetime.utcnow() if body.gdpr_consent else None,
+        gdpr_consent_at=datetime.now(timezone.utc) if body.gdpr_consent else None,
     )
     db.add(user)
     await db.commit()
