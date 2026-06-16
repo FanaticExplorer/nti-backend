@@ -13,7 +13,7 @@ mentorships, while admins have full visibility.
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -30,6 +30,7 @@ from app.schemas.mentorship import (
     MentorshipOut,
 )
 from app.services.audit_service import get_client_ip, write_audit_log
+from app.utils.email import send_mentor_assigned
 
 router = APIRouter(prefix="/mentorships", tags=["mentorships"])
 
@@ -38,6 +39,7 @@ router = APIRouter(prefix="/mentorships", tags=["mentorships"])
 async def assign_mentor(
     request: Request,
     body: MentorshipCreate,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(require_role("nti_admin")),
     db: AsyncSession = Depends(get_db),
 ):
@@ -53,7 +55,8 @@ async def assign_mentor(
     app_result = await db.execute(
         select(Application).where(Application.id == body.application_id)
     )
-    if not app_result.scalar_one_or_none():
+    app = app_result.scalar_one_or_none()
+    if not app:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Application not found"
         )
@@ -88,6 +91,11 @@ async def assign_mentor(
         {"application_id": str(body.application_id), "mentor_id": str(body.mentor_id)},
         ip_address=get_client_ip(request),
     )
+
+    applicant_result = await db.execute(select(User).where(User.id == app.applicant_id))
+    applicant = applicant_result.scalar_one_or_none()
+    if applicant:
+        background_tasks.add_task(send_mentor_assigned, applicant.email)
 
     return mentorship
 
