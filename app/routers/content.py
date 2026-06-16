@@ -18,7 +18,7 @@ lookup for editors.
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -58,8 +58,8 @@ async def list_pages(
         select(ContentPage).where(ContentPage.is_published).offset(skip).limit(limit)
     )
     pages = result.scalars().all()
-    total_result = await db.execute(select(ContentPage).where(ContentPage.is_published))
-    total = len(total_result.scalars().all())
+    total_result = await db.execute(select(func.count(ContentPage.id)).where(ContentPage.is_published))
+    total = total_result.scalar_one()
     return {
         "items": [ContentPageOut.model_validate(p) for p in pages],
         "total": total,
@@ -177,8 +177,8 @@ async def list_news(
         .limit(limit)
     )
     articles = result.scalars().all()
-    total_result = await db.execute(select(NewsArticle).where(NewsArticle.is_published))
-    total = len(total_result.scalars().all())
+    total_result = await db.execute(select(func.count(NewsArticle.id)).where(NewsArticle.is_published))
+    total = total_result.scalar_one()
     return {
         "items": [NewsArticleOut.model_validate(a) for a in articles],
         "total": total,
