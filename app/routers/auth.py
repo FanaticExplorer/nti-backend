@@ -33,6 +33,7 @@ from app.schemas.auth import (
     UserLogin,
     UserOut,
     UserRegister,
+    VerifyEmailRequest,
 )
 from app.utils.email import send_welcome_email
 from app.utils.security import (
@@ -174,18 +175,21 @@ async def refresh(
 
 @router.post("/verify-email")
 async def verify_email(
-    token: str,
+    body: VerifyEmailRequest,
     db: AsyncSession = Depends(get_db),
 ):
     """
     Verify a user's email address using a JWT verification token.
+
+    Accepts the token in the POST request body (not as a query parameter)
+    to prevent token leakage via server logs and browser history.
 
     Decodes the token, looks up the user by ``sub`` claim, and sets
     ``is_email_verified`` to ``True``.
 
     Returns 400 if the token is invalid, 404 if the user is not found.
     """
-    payload = decode_token(token)
+    payload = decode_token(body.token)
     user_id = payload.get("sub")
     if not user_id:
         raise HTTPException(

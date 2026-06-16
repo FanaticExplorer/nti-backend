@@ -120,14 +120,14 @@ async def test_verify_email_sets_flag(client: AsyncClient, user_factory):
 
     u = await user_factory(role="student", is_email_verified=False)
     token = create_access_token({"sub": str(u.id), "purpose": "email_verify"})
-    r = await client.post(f"/auth/verify-email?token={token}")
+    r = await client.post("/auth/verify-email", json={"token": token})
     assert r.status_code == 200
     assert r.json()["detail"] == "Email verified successfully"
 
 
 @pytest.mark.asyncio
 async def test_verify_email_bad_token_returns_400(client: AsyncClient):
-    r = await client.post("/auth/verify-email?token=garbage")
+    r = await client.post("/auth/verify-email", json={"token": "garbage"})
     assert r.status_code == 400
 
 
