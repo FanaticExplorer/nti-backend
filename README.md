@@ -22,7 +22,7 @@ The backend API for the NTI platform, built with FastAPI. It supports two core p
 - **§10 Data model** — 16 SQLAlchemy models covering all domain entities from the specification.
 - **§11.1 Backend modules** — 14 FastAPI routers, a service layer (`audit_service`), and utility modules for email and security.
 - **§11.2 API principles** — RESTful JSON API, Pydantic request/response validation, pagination (`skip`/`limit`), OpenAPI docs auto-generated at `/docs`.
-- **§13 Security & GDPR** — JWT with HS256, password hashing (bcrypt via passlib), rate limiting (slowapi), audit log for all sensitive actions, GDPR consent field with timestamp.
+- **§13 Security & GDPR** — JWT with HS256, password hashing (argon2 via passlib), rate limiting (slowapi), audit log for all sensitive actions, GDPR consent field with timestamp.
 - **§14 DevOps** — Docker Compose (PostgreSQL + App), Dockerfile, health check endpoint (`/health`), environment-based configuration via `.env`, `uv.lock` for reproducible builds.
 
 
@@ -33,7 +33,7 @@ The backend API for the NTI platform, built with FastAPI. It supports two core p
 | Framework | FastAPI (async) |
 | ORM | SQLAlchemy 2.0 (async) |
 | Migrations | Alembic |
-| Auth | JWT (python-jose + passlib[bcrypt]) |
+| Auth | JWT (python-jose + passlib[argon2]) |
 | Validation | Pydantic v2 |
 | Rate limiting | slowapi |
 | Email | fastapi-mail |
