@@ -33,6 +33,7 @@ from app.schemas.content import (
     NewsArticleOut,
     NewsArticleUpdate,
 )
+from app.utils.sanitize import sanitize_html
 
 router = APIRouter(prefix="/content", tags=["content"])
 
@@ -109,7 +110,9 @@ async def create_page(
             status_code=status.HTTP_409_CONFLICT, detail="Slug already exists"
         )
 
-    page = ContentPage(created_by=current_user.id, **body.model_dump())
+    data = body.model_dump()
+    data["body"] = sanitize_html(data["body"])
+    page = ContentPage(created_by=current_user.id, **data)
     db.add(page)
     await db.commit()
     await db.refresh(page)
@@ -139,6 +142,8 @@ async def update_page(
         )
 
     update_data = body.model_dump(exclude_unset=True)
+    if "body" in update_data:
+        update_data["body"] = sanitize_html(update_data["body"])
     for key, value in update_data.items():
         setattr(page, key, value)
     await db.commit()
@@ -224,9 +229,11 @@ async def create_news_article(
             status_code=status.HTTP_409_CONFLICT, detail="Slug already exists"
         )
 
+    data = body.model_dump()
+    data["body"] = sanitize_html(data["body"])
     article = NewsArticle(
         author_id=current_user.id,
-        **body.model_dump(),
+        **data,
     )
     db.add(article)
     await db.commit()
@@ -257,6 +264,8 @@ async def update_news_article(
         )
 
     update_data = body.model_dump(exclude_unset=True)
+    if "body" in update_data:
+        update_data["body"] = sanitize_html(update_data["body"])
     for key, value in update_data.items():
         setattr(article, key, value)
     await db.commit()

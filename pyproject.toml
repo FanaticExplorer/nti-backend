@@ -8,6 +8,7 @@ dependencies = [
     "aiofiles>=25.1.0",
     "alembic>=1.18.4",
     "asyncpg>=0.31.0",
+    "bleach>=6.4.0",
     "fastapi>=0.136.1",
     "fastapi-mail>=1.6.4",
     "passlib[argon2]>=1.7.4",
