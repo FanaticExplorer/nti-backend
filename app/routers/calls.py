@@ -27,6 +27,14 @@ from app.schemas.call import CallCreate, CallOut, CallStatusUpdate, CallUpdate
 
 router = APIRouter(prefix="/calls", tags=["calls"])
 
+VALID_TRANSITIONS: dict[str, list[str]] = {
+    "draft": ["open"],
+    "open": ["matching", "closed"],
+    "matching": ["assigned", "closed"],
+    "assigned": ["in_progress", "closed"],
+    "in_progress": ["closed"],
+}
+
 
 @router.get("")
 async def list_calls(
@@ -180,9 +188,11 @@ async def change_call_status(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Change the status of a call (e.g. ``open`` → ``closed``).
+    Change the status of a call.
 
-    No transition validation is enforced — any status string is accepted.
+    Validates the transition against ``VALID_TRANSITIONS``. If the
+    requested status is not an allowed next step from the current status,
+    a 422 error is returned listing the allowed transitions.
 
     **Access**: ``nti_admin``, ``super_admin``
     """
@@ -191,6 +201,13 @@ async def change_call_status(
     if not call:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Call not found"
+        )
+
+    allowed = VALID_TRANSITIONS.get(call.status, [])
+    if body.status not in allowed:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Cannot transition from '{call.status}' to '{body.status}'. Allowed: {allowed}",
         )
 
     call.status = body.status
