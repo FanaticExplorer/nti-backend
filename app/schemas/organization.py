@@ -28,6 +28,15 @@ class OrganizationOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class OrganizationUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=255)
+    ico: Optional[str] = None
+    sector: Optional[str] = None
+    description: Optional[str] = None
+    website: Optional[str] = None
+    contact_email: Optional[str] = None
+
+
 class AddMemberRequest(BaseModel):
     user_id: UUID
     role_in_org: Optional[str] = None

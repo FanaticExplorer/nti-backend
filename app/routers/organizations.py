@@ -25,6 +25,7 @@ from app.schemas.organization import (
     AddMemberRequest,
     OrganizationCreate,
     OrganizationOut,
+    OrganizationUpdate,
 )
 from app.services.audit_service import get_client_ip, write_audit_log
 from app.utils.email import send_organization_approved
@@ -163,6 +164,43 @@ async def approve_organization(
     background_tasks.add_task(send_organization_approved, org.contact_email)
 
     return {"detail": "Organization approved"}
+
+
+@router.put("/{org_id}", response_model=OrganizationOut)
+async def update_organization(
+    org_id: uuid.UUID,
+    body: OrganizationUpdate,
+    current_user: User = Depends(require_role("firm", "nti_admin", "super_admin")),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(Organization).where(Organization.id == org_id))
+    org = result.scalar_one_or_none()
+    if not org:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found"
+        )
+
+    # firm users can only update their own org
+    if current_user.role == "firm":
+        member_check = await db.execute(
+            select(org_members).where(
+                org_members.c.user_id == current_user.id,
+                org_members.c.organization_id == org_id,
+                org_members.c.role_in_org == "owner",
+            )
+        )
+        if not member_check.first():
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only organization owner can edit",
+            )
+
+    update_data = body.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(org, key, value)
+    await db.commit()
+    await db.refresh(org)
+    return org
 
 
 @router.post("/{org_id}/members")
