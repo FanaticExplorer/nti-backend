@@ -1,11 +1,12 @@
 from typing import List
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
     DATABASE_URL: str = ""
-    JWT_SECRET_KEY: str = "dev-secret-change-me"
+    JWT_SECRET_KEY: str = ""
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
@@ -21,7 +22,13 @@ class Settings(BaseSettings):
     CORS_ORIGINS: str = "http://localhost:5173,http://localhost:3000"
     MAX_UPLOAD_SIZE_MB: int = 10
     UPLOAD_DIR: str = "uploads"
-    APP_ENV: str = "development"
+
+    @field_validator("DATABASE_URL", "JWT_SECRET_KEY")
+    @classmethod
+    def not_empty(cls, v: str) -> str:
+        if not v:
+            raise ValueError("must be set via environment or .env file")
+        return v
 
     @property
     def cors_origins_list(self) -> List[str]:

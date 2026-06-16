@@ -22,6 +22,9 @@ from sqlalchemy.pool import StaticPool
 from sqlalchemy.sql import sqltypes
 from sqlalchemy.types import TypeDecorator
 
+os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
+os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-for-testing-only")
+
 from app.database import Base, get_db
 from app.main import app
 from app.models.application import Application
