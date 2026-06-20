@@ -31,6 +31,7 @@ from app.models.document import Document
 from app.models.program import Program
 from app.models.student_profile import StudentProfile
 from app.models.team import Team, team_members
+from app.models.tech_spec import TechSpec
 from app.models.user import User
 from app.schemas.application import (
     ApplicationCreate,
@@ -94,9 +95,42 @@ async def create_application(
 
     **Access**: ``student``, ``team_leader``
     """
+    if body.tech_spec_id:
+        ts_result = await db.execute(
+            select(TechSpec).where(TechSpec.id == body.tech_spec_id)
+        )
+        ts = ts_result.scalar_one_or_none()
+        if not ts:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Tech spec not found"
+            )
+        call_result = await db.execute(
+            select(Call).where(Call.id == body.call_id)
+        )
+        call = call_result.scalar_one_or_none()
+        if not call:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Call not found"
+            )
+        program_result = await db.execute(
+            select(Program).where(Program.id == call.program_id)
+        )
+        program = program_result.scalar_one_or_none()
+        if not program or program.type != "B":
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail="Tech spec ID can only be used for Program B applications",
+            )
+        if ts.call_id != body.call_id:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail="Tech spec does not belong to the specified call",
+            )
+
     app = Application(
         call_id=body.call_id,
         team_id=body.team_id,
+        tech_spec_id=body.tech_spec_id,
         applicant_id=current_user.id,
         form_data=body.form_data,
     )
@@ -362,6 +396,27 @@ async def submit_application(
                 detail=f"Missing required documents for Program A: {', '.join(missing)}",
             )
 
+    # Program B validation
+    if program and program.type == "B":
+        if not app.tech_spec_id:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail="Program B requires a tech spec ID",
+            )
+        ts_result = await db.execute(
+            select(TechSpec).where(TechSpec.id == app.tech_spec_id)
+        )
+        ts = ts_result.scalar_one_or_none()
+        if not ts:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Linked tech spec not found"
+            )
+        if ts.status not in ("published", "in_pairing"):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail=f"Tech spec must be published or in_pairing, current status: {ts.status}",
+            )
+
     old_status = app.status
     app.status = "submitted"
     app.is_draft = False
@@ -442,6 +497,15 @@ async def change_application_status(
     db.add(history)
     await db.commit()
     await db.refresh(app)
+
+    if body.status == "approved" and app.tech_spec_id:
+        ts_result = await db.execute(
+            select(TechSpec).where(TechSpec.id == app.tech_spec_id)
+        )
+        ts = ts_result.scalar_one_or_none()
+        if ts and ts.status == "in_pairing":
+            ts.status = "assigned"
+            await db.commit()
 
     await write_audit_log(
         db,

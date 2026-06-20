@@ -22,6 +22,7 @@ from app.routers import (
     programs,
     student_profiles,
     teams,
+    tech_specs,
     users,
 )
 
@@ -85,3 +86,4 @@ app.include_router(evaluations.router)
 app.include_router(mentorships.router)
 app.include_router(milestones.router)
 app.include_router(content.router)
+app.include_router(tech_specs.router)

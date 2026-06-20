@@ -46,3 +46,4 @@ class Organization(Base):
         secondary="org_members",
         back_populates="organizations",
     )
+    tech_specs = relationship("TechSpec", back_populates="organization")

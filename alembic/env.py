@@ -24,6 +24,7 @@ from app.models import (  # noqa: F401
     program,
     student_profile,
     team,
+    tech_spec,
     user,
 )
 

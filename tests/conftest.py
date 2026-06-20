@@ -76,6 +76,7 @@ def _patch_pg_types_for_sqlite():
     import app.models.program  # noqa: F401
     import app.models.student_profile  # noqa: F401
     import app.models.team  # noqa: F401
+    import app.models.tech_spec  # noqa: F401
     import app.models.user  # noqa: F401
 
     for table in list(Base.metadata.tables.values()):

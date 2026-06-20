@@ -12,6 +12,7 @@ from app.schemas.team import TeamOut
 class ApplicationCreate(BaseModel):
     call_id: UUID
     team_id: Optional[UUID] = None
+    tech_spec_id: Optional[UUID] = None
     form_data: dict = {}
 
 
@@ -28,6 +29,7 @@ class ApplicationOut(BaseModel):
     id: UUID
     call_id: UUID
     team_id: Optional[UUID]
+    tech_spec_id: Optional[UUID]
     applicant_id: UUID
     form_data: dict
     status: str

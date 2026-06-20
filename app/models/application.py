@@ -56,9 +56,14 @@ class Application(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
+    tech_spec_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("tech_specs.id"), nullable=True
+    )
+
     call = relationship("Call", back_populates="applications")
     team = relationship("Team")
     applicant = relationship("User", foreign_keys=[applicant_id])
+    tech_spec = relationship("TechSpec", back_populates="applications")
     status_history = relationship(
         "ApplicationStatusHistory",
         back_populates="application",
