@@ -15,7 +15,7 @@ Maximum file size is configured via ``settings.MAX_UPLOAD_SIZE_MB``.
 import os
 import uuid
 
-from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -49,6 +49,8 @@ async def upload_document(
     request: Request,
     application_id: uuid.UUID,
     file: UploadFile = File(...),
+    classification: str | None = Form(None),
+    document_type: str | None = Form(None),
     current_user: User = Depends(require_role("student", "team_leader")),
     db: AsyncSession = Depends(get_db),
 ):
@@ -134,6 +136,8 @@ async def upload_document(
         file_path=file_path,
         file_size=len(content),
         mime_type=file.content_type,
+        classification=classification or "internal",
+        document_type=document_type,
         version=version,
     )
     db.add(doc)
@@ -184,6 +188,12 @@ async def download_document(
     if current_user.role not in allowed and doc.uploaded_by != current_user.id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
+        )
+
+    if doc.classification == "confidential" and current_user.role not in ("nti_admin", "super_admin"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Confidential documents require admin access",
         )
 
     if not os.path.exists(doc.file_path):

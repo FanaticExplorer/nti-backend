@@ -12,6 +12,7 @@ class DocumentOut(BaseModel):
     file_size: int
     mime_type: str
     classification: str
+    document_type: str | None = None
     version: int
     created_at: datetime
 

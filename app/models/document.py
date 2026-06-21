@@ -37,6 +37,7 @@ class Document(Base):
         default="internal",
     )
     version: Mapped[int] = mapped_column(Integer, default=1)
+    document_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
