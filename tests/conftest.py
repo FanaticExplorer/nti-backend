@@ -78,6 +78,7 @@ def _patch_pg_types_for_sqlite():
     import app.models.content  # noqa: F401
     import app.models.document  # noqa: F401
     import app.models.evaluation  # noqa: F401
+    import app.models.faq  # noqa: F401
     import app.models.mentorship  # noqa: F401
     import app.models.mentorship_log  # noqa: F401
     import app.models.milestone  # noqa: F401

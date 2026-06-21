@@ -25,6 +25,7 @@ from app.database import get_db
 from app.dependencies import require_role
 from app.models.contact_message import ContactMessage
 from app.models.content import ContentPage, NewsArticle
+from app.models.faq import FAQ
 from app.models.user import User
 from app.schemas.contact import ContactMessageCreate, ContactMessageOut
 from app.schemas.content import (
@@ -35,6 +36,7 @@ from app.schemas.content import (
     NewsArticleOut,
     NewsArticleUpdate,
 )
+from app.schemas.faq import FAQCreate, FAQOut, FAQUpdate
 from app.utils.sanitize import sanitize_html
 
 from app.routers.auth import limiter
@@ -356,3 +358,76 @@ async def toggle_contact_message_read(
     await db.commit()
 
     return ContactMessageOut.model_validate(msg)
+
+
+# ── FAQ ──
+
+
+@router.get("/faq")
+async def list_faq(
+    category: str | None = Query(None),
+    db: AsyncSession = Depends(get_db),
+):
+    query = (
+        select(FAQ)
+        .where(FAQ.is_published)
+        .order_by(FAQ.sort_order)
+    )
+    if category:
+        query = query.where(FAQ.category == category)
+
+    result = await db.execute(query)
+    items = result.scalars().all()
+    return {"items": [FAQOut.model_validate(f) for f in items]}
+
+
+@router.post("/faq", response_model=FAQOut, status_code=status.HTTP_201_CREATED)
+async def create_faq(
+    body: FAQCreate,
+    current_user: User = Depends(require_role("content_editor", "nti_admin")),
+    db: AsyncSession = Depends(get_db),
+):
+    faq = FAQ(**body.model_dump())
+    db.add(faq)
+    await db.commit()
+    await db.refresh(faq)
+    return faq
+
+
+@router.patch("/faq/{faq_id}", response_model=FAQOut)
+async def update_faq(
+    faq_id: uuid.UUID,
+    body: FAQUpdate,
+    current_user: User = Depends(require_role("content_editor", "nti_admin")),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(FAQ).where(FAQ.id == faq_id))
+    faq = result.scalar_one_or_none()
+    if not faq:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="FAQ not found"
+        )
+
+    update_data = body.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(faq, key, value)
+    await db.commit()
+    await db.refresh(faq)
+    return faq
+
+
+@router.delete("/faq/{faq_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_faq(
+    faq_id: uuid.UUID,
+    current_user: User = Depends(require_role("content_editor", "nti_admin")),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(select(FAQ).where(FAQ.id == faq_id))
+    faq = result.scalar_one_or_none()
+    if not faq:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="FAQ not found"
+        )
+
+    await db.delete(faq)
+    await db.commit()

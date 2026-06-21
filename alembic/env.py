@@ -18,6 +18,7 @@ from app.models import (  # noqa: F401
     content,
     document,
     evaluation,
+    faq,
     mentorship,
     mentorship_log,
     milestone,
