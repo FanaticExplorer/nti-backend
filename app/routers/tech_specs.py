@@ -363,3 +363,50 @@ async def delete_tech_spec(
 
     await db.delete(ts)
     await db.commit()
+
+
+# ── Firm Dashboard ──
+
+
+@router.get("/firm/dashboard")
+async def firm_dashboard(
+    current_user: User = Depends(require_role("firm")),
+    db: AsyncSession = Depends(get_db),
+):
+    org_result = await db.execute(
+        select(Organization)
+        .join(org_members, org_members.c.organization_id == Organization.id)
+        .where(
+            org_members.c.user_id == current_user.id,
+            org_members.c.role_in_org == "owner",
+        )
+        .limit(1)
+    )
+    org = org_result.scalar_one_or_none()
+    if not org:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="No organization found"
+        )
+
+    specs_result = await db.execute(
+        select(TechSpec.status, func.count(TechSpec.id))
+        .where(TechSpec.organization_id == org.id)
+        .group_by(TechSpec.status)
+    )
+    specs_by_status = {row[0]: row[1] for row in specs_result.all()}
+
+    calls_result = await db.execute(
+        select(func.count(Call.id)).where(Call.organization_id == org.id)
+    )
+    active_calls = calls_result.scalar_one()
+
+    return {
+        "organization": {
+            "id": str(org.id),
+            "name": org.name,
+            "is_approved": org.is_approved,
+        },
+        "tech_specs_by_status": specs_by_status,
+        "total_tech_specs": sum(specs_by_status.values()),
+        "active_calls": active_calls,
+    }
