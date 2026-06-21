@@ -11,6 +11,7 @@ from app.database import Base
 # Import all models so they are registered on Base.metadata
 from app.models import (  # noqa: F401
     application,
+    application_comment,
     application_status_history,
     audit_log,
     call,

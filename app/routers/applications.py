@@ -25,6 +25,7 @@ from sqlalchemy.orm import selectinload
 from app.database import get_db
 from app.dependencies import get_current_user, require_role
 from app.models.application import Application
+from app.models.application_comment import ApplicationComment
 from app.models.application_status_history import ApplicationStatusHistory
 from app.models.call import Call
 from app.models.document import Document
@@ -40,6 +41,10 @@ from app.schemas.application import (
     ApplicationStatusHistoryOut,
     ApplicationStatusUpdate,
     ApplicationUpdate,
+)
+from app.schemas.application_comment import (
+    ApplicationCommentCreate,
+    ApplicationCommentOut,
 )
 from app.services.audit_service import get_client_ip, write_audit_log
 from app.utils.email import send_application_submitted, send_status_change
@@ -584,3 +589,103 @@ async def get_application_history(
         "items": [ApplicationStatusHistoryOut.model_validate(h) for h in history],
         "total": len(history),
     }
+
+
+# ── Comments ──
+
+
+@router.get("/{application_id}/comments")
+async def list_application_comments(
+    application_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    app = await _get_app(application_id, db)
+
+    is_admin = current_user.role in ("nti_admin", "evaluator", "mentor")
+    is_owner = app.applicant_id == current_user.id and current_user.role in ("student", "team_leader")
+
+    if not is_admin and not is_owner:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Access denied"
+        )
+
+    result = await db.execute(
+        select(ApplicationComment)
+        .where(ApplicationComment.application_id == application_id)
+        .order_by(ApplicationComment.created_at)
+    )
+    comments = result.scalars().all()
+
+    items = []
+    for c in comments:
+        if not is_admin and c.is_internal:
+            continue
+        user_result = await db.execute(select(User).where(User.id == c.user_id))
+        comment_user = user_result.scalar_one_or_none()
+        items.append(
+            ApplicationCommentOut(
+                id=c.id,
+                application_id=c.application_id,
+                user_id=c.user_id,
+                user_name=comment_user.full_name if comment_user else "Unknown",
+                body=c.body,
+                is_internal=c.is_internal,
+                created_at=c.created_at,
+            )
+        )
+
+    return {"items": items}
+
+
+@router.post(
+    "/{application_id}/comments",
+    response_model=ApplicationCommentOut,
+    status_code=status.HTTP_201_CREATED,
+)
+async def add_application_comment(
+    request: Request,
+    application_id: uuid.UUID,
+    body: ApplicationCommentCreate,
+    current_user: User = Depends(require_role("nti_admin", "evaluator")),
+    db: AsyncSession = Depends(get_db),
+):
+    app = await _get_app(application_id, db)
+
+    comment = ApplicationComment(
+        application_id=application_id,
+        user_id=current_user.id,
+        body=body.body,
+        is_internal=body.is_internal,
+    )
+    db.add(comment)
+    await db.commit()
+    await db.refresh(comment)
+
+    await write_audit_log(
+        db,
+        current_user.id,
+        "application.comment_added",
+        "application",
+        str(application_id),
+        {"comment_id": str(comment.id)},
+        ip_address=get_client_ip(request),
+    )
+
+    await create_notification(
+        db, app.applicant_id,
+        "New comment",
+        "A new comment has been added to your application.",
+        "comment_added",
+        "application", str(application_id),
+    )
+
+    return ApplicationCommentOut(
+        id=comment.id,
+        application_id=comment.application_id,
+        user_id=comment.user_id,
+        user_name=current_user.full_name,
+        body=comment.body,
+        is_internal=comment.is_internal,
+        created_at=comment.created_at,
+    )

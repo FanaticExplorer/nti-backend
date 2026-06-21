@@ -71,6 +71,7 @@ def _patch_pg_types_for_sqlite():
 
     # Force import of all model modules so tables are registered in metadata
     import app.models.application  # noqa: F401
+    import app.models.application_comment  # noqa: F401
     import app.models.application_status_history  # noqa: F401
     import app.models.audit_log  # noqa: F401
     import app.models.call  # noqa: F401

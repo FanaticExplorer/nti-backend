@@ -73,3 +73,7 @@ class Application(Base):
     evaluations = relationship("Evaluation", back_populates="application")
     mentorships = relationship("Mentorship", back_populates="application")
     milestones = relationship("Milestone", back_populates="application")
+    comments = relationship(
+        "ApplicationComment", back_populates="application",
+        order_by="ApplicationComment.created_at"
+    )
