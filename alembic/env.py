@@ -21,6 +21,7 @@ from app.models import (  # noqa: F401
     mentorship,
     mentorship_log,
     milestone,
+    notification,
     organization,
     program,
     student_profile,

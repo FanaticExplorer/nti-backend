@@ -29,6 +29,7 @@ from app.schemas.organization import (
 )
 from app.services.audit_service import get_client_ip, write_audit_log
 from app.utils.email import send_organization_approved
+from app.utils.notifications import create_notification
 
 router = APIRouter(prefix="/organizations", tags=["organizations"])
 
@@ -162,6 +163,22 @@ async def approve_organization(
     )
 
     background_tasks.add_task(send_organization_approved, org.contact_email)
+
+    owner_result = await db.execute(
+        select(User).join(org_members, org_members.c.user_id == User.id).where(
+            org_members.c.organization_id == org_id,
+            org_members.c.role_in_org == "owner",
+        ).limit(1)
+    )
+    owner = owner_result.scalar_one_or_none()
+    if owner:
+        await create_notification(
+            db, owner.id,
+            "Organization approved",
+            "Your organization has been approved.",
+            "organization_approved",
+            "organization", str(org.id),
+        )
 
     return {"detail": "Organization approved"}
 

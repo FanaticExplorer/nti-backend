@@ -60,3 +60,6 @@ class User(Base):
         secondary="org_members",
         back_populates="members",
     )
+    notifications = relationship(
+        "Notification", back_populates="user", order_by="Notification.created_at.desc()"
+    )

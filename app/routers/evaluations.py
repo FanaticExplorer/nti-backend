@@ -26,6 +26,7 @@ from app.models.evaluation import Evaluation
 from app.models.user import User
 from app.schemas.evaluation import EvaluationCreate, EvaluationOut, EvaluationUpdate
 from app.services.audit_service import get_client_ip, write_audit_log
+from app.utils.notifications import create_notification
 
 router = APIRouter(prefix="/evaluations", tags=["evaluations"])
 
@@ -77,6 +78,19 @@ async def create_evaluation(
         {"application_id": str(body.application_id)},
         ip_address=get_client_ip(request),
     )
+
+    app_result = await db.execute(
+        select(Application).where(Application.id == body.application_id)
+    )
+    app = app_result.scalar_one_or_none()
+    if app:
+        await create_notification(
+            db, app.applicant_id,
+            "New evaluation",
+            "Your application has received a new evaluation.",
+            "evaluation_added",
+            "application", str(app.id),
+        )
 
     return evaluation
 

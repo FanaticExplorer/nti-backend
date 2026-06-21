@@ -43,6 +43,7 @@ from app.schemas.application import (
 )
 from app.services.audit_service import get_client_ip, write_audit_log
 from app.utils.email import send_application_submitted, send_status_change
+from app.utils.notifications import create_notification
 
 router = APIRouter(prefix="/applications", tags=["applications"])
 
@@ -449,6 +450,14 @@ async def submit_application(
     if applicant:
         background_tasks.add_task(send_application_submitted, applicant.email)
 
+    await create_notification(
+        db, app.applicant_id,
+        "Application submitted",
+        "Your application has been submitted and is being processed.",
+        "application_submitted",
+        "application", str(app.id),
+    )
+
     return app
 
 
@@ -522,6 +531,23 @@ async def change_application_status(
     applicant = user_result.scalar_one_or_none()
     if applicant:
         background_tasks.add_task(send_status_change, applicant.email, body.status)
+
+    if body.status == "revision_requested":
+        await create_notification(
+            db, app.applicant_id,
+            "Revision requested",
+            "Your application requires revisions. Please update and resubmit.",
+            "revision_requested",
+            "application", str(app.id),
+        )
+    else:
+        await create_notification(
+            db, app.applicant_id,
+            f"Status changed to {body.status}",
+            f"Your application status is now: {body.status}",
+            "status_changed",
+            "application", str(app.id),
+        )
 
     return app
 

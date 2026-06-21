@@ -36,6 +36,7 @@ from app.schemas.auth import (
     VerifyEmailRequest,
 )
 from app.utils.email import send_password_reset, send_welcome_email
+from app.utils.notifications import create_notification
 from app.utils.security import (
     create_access_token,
     create_refresh_token,
@@ -87,6 +88,13 @@ async def register(
     await db.refresh(user)
 
     background_tasks.add_task(send_welcome_email, user.email)
+
+    await create_notification(
+        db, user.id,
+        "Welcome to NTI",
+        "Your account has been created. Please verify your email.",
+        "account_created",
+    )
 
     return user
 

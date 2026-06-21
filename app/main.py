@@ -18,6 +18,7 @@ from app.routers import (
     evaluations,
     mentorships,
     milestones,
+    notifications,
     organizations,
     programs,
     student_profiles,
@@ -86,4 +87,5 @@ app.include_router(evaluations.router)
 app.include_router(mentorships.router)
 app.include_router(milestones.router)
 app.include_router(content.router)
+app.include_router(notifications.router)
 app.include_router(tech_specs.router)

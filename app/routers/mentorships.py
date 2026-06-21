@@ -31,6 +31,7 @@ from app.schemas.mentorship import (
 )
 from app.services.audit_service import get_client_ip, write_audit_log
 from app.utils.email import send_mentor_assigned
+from app.utils.notifications import create_notification
 
 router = APIRouter(prefix="/mentorships", tags=["mentorships"])
 
@@ -96,6 +97,21 @@ async def assign_mentor(
     applicant = applicant_result.scalar_one_or_none()
     if applicant:
         background_tasks.add_task(send_mentor_assigned, applicant.email)
+
+    await create_notification(
+        db, app.applicant_id,
+        "Mentor assigned",
+        "A mentor has been assigned to your project.",
+        "mentor_assigned",
+        "application", str(app.id),
+    )
+    await create_notification(
+        db, body.mentor_id,
+        "Mentor assigned",
+        "You have been assigned as a mentor to a project.",
+        "mentor_assigned",
+        "application", str(app.id),
+    )
 
     return mentorship
 
