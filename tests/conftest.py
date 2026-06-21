@@ -33,7 +33,15 @@ from app.models.organization import Organization, org_members
 from app.models.program import Program
 from app.models.team import Team, team_members
 from app.models.user import User
-from app.utils.security import create_access_token, hash_password
+from app.utils import security as _sec
+from app.utils.security import create_access_token
+
+_sec.pwd_context = __import__("passlib.context", fromlist=["CryptContext"]).CryptContext(
+    schemes=["sha256_crypt"],
+    sha256_crypt__default_rounds=1000,
+    deprecated="auto",
+)
+hash_password = _sec.hash_password
 
 # ── Prevent real email sending in tests ───────────────────────────────────
 
@@ -189,7 +197,7 @@ async def user_factory(db: AsyncSession) -> Callable[..., Awaitable[User]]:
         user = User(
             id=uuid.uuid4(),
             email=email,
-            hashed_password=hash_password("testpass123"),
+            hashed_password=_TEST_PASSWORD_HASH,
             full_name=full_name,
             role=role,
             is_active=is_active,
@@ -252,6 +260,11 @@ async def super_admin(db: AsyncSession, user_factory) -> User:
 async def content_editor(db: AsyncSession, user_factory) -> User:
     """Convenience: a persisted content_editor user."""
     return await user_factory(role="content_editor")
+
+
+# ── Pre-compute password hash (avoid re-hashing every time) ──
+
+_TEST_PASSWORD_HASH = hash_password("testpass123")
 
 
 # ── Higher-level domain fixtures ──────────────────────────────────────────
