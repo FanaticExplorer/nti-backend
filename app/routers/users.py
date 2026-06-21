@@ -12,14 +12,20 @@ requires ``super_admin`` specifically).
 """
 
 import uuid
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.database import get_db
-from app.dependencies import require_role
+from app.dependencies import get_current_user, require_role
+from app.models.application import Application
+from app.models.notification import Notification
+from app.models.student_profile import StudentProfile
 from app.models.user import User
+from app.schemas.auth import UserOut
 from app.schemas.user import UserListOut, UserUpdateRole
 from app.services.audit_service import get_client_ip, write_audit_log
 
@@ -155,3 +161,84 @@ async def deactivate_user(
     )
 
     return UserListOut.model_validate(user)
+
+
+@router.get("/me/export")
+async def export_my_data(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(User)
+        .options(
+            selectinload(User.student_profile),
+            selectinload(User.organizations),
+        )
+        .where(User.id == current_user.id)
+    )
+    user = result.scalar_one()
+
+    apps_result = await db.execute(
+        select(Application).where(Application.applicant_id == current_user.id)
+    )
+    applications = apps_result.scalars().all()
+
+    notifs_result = await db.execute(
+        select(Notification).where(Notification.user_id == current_user.id)
+    )
+    notifications = notifs_result.scalars().all()
+
+    return {
+        "user": UserOut.model_validate(user).model_dump(),
+        "student_profile": (
+            {
+                "university": user.student_profile.university,
+                "field_of_study": user.student_profile.field_of_study,
+                "year": user.student_profile.year,
+                "bio": user.student_profile.bio,
+            }
+            if user.student_profile
+            else None
+        ),
+        "applications": [
+            {
+                "id": str(a.id),
+                "status": a.status,
+                "call_id": str(a.call_id),
+                "form_data": a.form_data,
+                "submitted_at": a.submitted_at.isoformat() if a.submitted_at else None,
+                "created_at": a.created_at.isoformat(),
+            }
+            for a in applications
+        ],
+        "organizations": [
+            {"id": str(o.id), "name": o.name} for o in user.organizations
+        ],
+        "notifications_count": len(notifications),
+        "exported_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@router.delete("/me")
+async def anonymize_my_account(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    user = current_user
+    user.email = f"anonymized_{user.id}@deleted.nti.sk"
+    user.full_name = "Deleted User"
+    user.hashed_password = ""
+    user.is_active = False
+    await db.commit()
+
+    await write_audit_log(
+        db,
+        user.id,
+        "user.anonymized",
+        "user",
+        str(user.id),
+        ip_address=get_client_ip(request),
+    )
+
+    return {"detail": "Account anonymized"}
