@@ -60,3 +60,41 @@ async def test_update_program(client: AsyncClient, nti_admin, program):
     )
     assert r.status_code == 200
     assert r.json()["title"] == "Updated Title"
+
+
+@pytest.mark.asyncio
+async def test_create_program_with_categories(client: AsyncClient, nti_admin):
+    r = await client.post(
+        "/programs",
+        json={
+            "title": "Categorized Program",
+            "type": "A",
+            "description": "Has categories",
+            "categories": ["web_dev", "ai", "iot"],
+        },
+        headers=auth_headers(nti_admin),
+    )
+    assert r.status_code == 201
+    assert r.json()["categories"] == ["web_dev", "ai", "iot"]
+
+
+@pytest.mark.asyncio
+async def test_update_program_categories(client: AsyncClient, nti_admin, program):
+    r = await client.put(
+        f"/programs/{program.id}",
+        json={"categories": ["game_dev"]},
+        headers=auth_headers(nti_admin),
+    )
+    assert r.status_code == 200
+    assert r.json()["categories"] == ["game_dev"]
+
+
+@pytest.mark.asyncio
+async def test_program_without_categories(client: AsyncClient, nti_admin):
+    r = await client.post(
+        "/programs",
+        json={"title": "No Cats", "type": "B", "description": "No categories"},
+        headers=auth_headers(nti_admin),
+    )
+    assert r.status_code == 201
+    assert r.json()["categories"] is None
