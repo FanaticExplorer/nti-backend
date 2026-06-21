@@ -66,6 +66,7 @@ def _patch_pg_types_for_sqlite():
     import app.models.application_status_history  # noqa: F401
     import app.models.audit_log  # noqa: F401
     import app.models.call  # noqa: F401
+    import app.models.contact_message  # noqa: F401
     import app.models.content  # noqa: F401
     import app.models.document  # noqa: F401
     import app.models.evaluation  # noqa: F401

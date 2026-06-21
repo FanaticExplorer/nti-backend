@@ -14,6 +14,7 @@ from app.models import (  # noqa: F401
     application_status_history,
     audit_log,
     call,
+    contact_message,
     content,
     document,
     evaluation,

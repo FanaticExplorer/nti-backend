@@ -17,14 +17,16 @@ lookup for editors.
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.dependencies import require_role
+from app.models.contact_message import ContactMessage
 from app.models.content import ContentPage, NewsArticle
 from app.models.user import User
+from app.schemas.contact import ContactMessageCreate, ContactMessageOut
 from app.schemas.content import (
     ContentPageCreate,
     ContentPageOut,
@@ -34,6 +36,9 @@ from app.schemas.content import (
     NewsArticleUpdate,
 )
 from app.utils.sanitize import sanitize_html
+
+from app.routers.auth import limiter
+from app.utils.email import _send
 
 router = APIRouter(prefix="/content", tags=["content"])
 
@@ -271,3 +276,79 @@ async def update_news_article(
     await db.commit()
     await db.refresh(article)
     return article
+
+
+# ── Contact ──
+
+
+@router.post("/contact")
+@limiter.limit("3/hour")
+async def submit_contact_message(
+    request: Request,
+    body: ContactMessageCreate,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+):
+    msg = ContactMessage(
+        name=body.name,
+        email=body.email,
+        message=body.message,
+    )
+    db.add(msg)
+    await db.commit()
+
+    background_tasks.add_task(
+        _send,
+        "admin@nti.sk",
+        f"New contact message from {body.name}",
+        f"<p><b>From:</b> {body.name} ({body.email})</p><p>{body.message}</p>",
+    )
+
+    return {"detail": "Message sent"}
+
+
+@router.get("/contact-messages")
+async def list_contact_messages(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    is_read: bool | None = Query(None),
+    current_user: User = Depends(require_role("nti_admin", "super_admin")),
+    db: AsyncSession = Depends(get_db),
+):
+    query = select(ContactMessage).order_by(ContactMessage.created_at.desc())
+    if is_read is not None:
+        query = query.where(ContactMessage.is_read == is_read)
+
+    count_query = select(func.count()).select_from(query.subquery())
+    total = (await db.execute(count_query)).scalar_one()
+
+    result = await db.execute(query.offset(skip).limit(limit))
+    messages = result.scalars().all()
+
+    return {
+        "items": [ContactMessageOut.model_validate(m) for m in messages],
+        "total": total,
+        "skip": skip,
+        "limit": limit,
+    }
+
+
+@router.patch("/contact-messages/{message_id}/read")
+async def toggle_contact_message_read(
+    message_id: uuid.UUID,
+    current_user: User = Depends(require_role("nti_admin", "super_admin")),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(ContactMessage).where(ContactMessage.id == message_id)
+    )
+    msg = result.scalar_one_or_none()
+    if not msg:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Message not found"
+        )
+
+    msg.is_read = not msg.is_read
+    await db.commit()
+
+    return ContactMessageOut.model_validate(msg)
