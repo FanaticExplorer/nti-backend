@@ -82,7 +82,11 @@ async def get_page(slug: str, db: AsyncSession = Depends(get_db)):
 
     **Access**: public
     """
-    result = await db.execute(select(ContentPage).where(ContentPage.slug == slug))
+    result = await db.execute(
+        select(ContentPage).where(
+            ContentPage.slug == slug, ContentPage.is_published
+        )
+    )
     page = result.scalar_one_or_none()
     if not page:
         raise HTTPException(

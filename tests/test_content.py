@@ -61,6 +61,49 @@ async def test_create_page_duplicate_slug_returns_409(
     assert r.status_code == 409
 
 
+@pytest.mark.asyncio
+async def test_get_unpublished_page_returns_404(
+    client: AsyncClient, content_editor
+):
+    await client.post(
+        "/content/pages",
+        json={
+            "slug": "draft-page",
+            "title": "Draft",
+            "body": "Not ready",
+            "is_published": False,
+        },
+        headers=auth_headers(content_editor),
+    )
+    r = await client.get("/content/pages/draft-page")
+    assert r.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_get_published_page_returns_seo_fields(
+    client: AsyncClient, content_editor
+):
+    await client.post(
+        "/content/pages",
+        json={
+            "slug": "seo-page",
+            "title": "SEO Page",
+            "body": "Content",
+            "meta_title": "Custom Meta",
+            "meta_description": "Custom description",
+            "og_image_url": "https://example.com/img.png",
+            "is_published": True,
+        },
+        headers=auth_headers(content_editor),
+    )
+    r = await client.get("/content/pages/seo-page")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["meta_title"] == "Custom Meta"
+    assert data["meta_description"] == "Custom description"
+    assert data["og_image_url"] == "https://example.com/img.png"
+
+
 # ── News ──
 
 
