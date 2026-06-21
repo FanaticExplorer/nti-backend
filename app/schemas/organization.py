@@ -39,4 +39,8 @@ class OrganizationUpdate(BaseModel):
 
 class AddMemberRequest(BaseModel):
     user_id: UUID
-    role_in_org: Optional[str] = None
+    role_in_org: str = Field(default="member", pattern="^(admin|member|product_owner)$")
+
+
+class UpdateMemberRoleRequest(BaseModel):
+    role_in_org: str = Field(pattern="^(admin|member|product_owner)$")

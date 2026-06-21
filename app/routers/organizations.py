@@ -18,7 +18,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.dependencies import require_role
+from app.dependencies import get_current_user, require_role
 from app.models.organization import Organization, org_members
 from app.models.user import User
 from app.schemas.organization import (
@@ -26,6 +26,7 @@ from app.schemas.organization import (
     OrganizationCreate,
     OrganizationOut,
     OrganizationUpdate,
+    UpdateMemberRoleRequest,
 )
 from app.services.audit_service import get_client_ip, write_audit_log
 from app.utils.email import send_organization_approved
@@ -224,17 +225,9 @@ async def update_organization(
 async def add_member(
     org_id: uuid.UUID,
     body: AddMemberRequest,
-    current_user: User = Depends(require_role("firm")),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """
-    Add a user as a member of an organization.
-
-    Only the organization ``owner`` can add new members. The new member's
-    role within the organization is specified in the request body.
-
-    **Access**: ``firm`` (must be the organization owner)
-    """
     result = await db.execute(select(Organization).where(Organization.id == org_id))
     org = result.scalar_one_or_none()
     if not org:
@@ -242,18 +235,31 @@ async def add_member(
             status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found"
         )
 
-    # Check if user is the organization owner
-    member_check = await db.execute(
+    is_admin = current_user.role in ("nti_admin", "super_admin")
+    if not is_admin:
+        member_check = await db.execute(
+            select(org_members).where(
+                org_members.c.user_id == current_user.id,
+                org_members.c.organization_id == org_id,
+                org_members.c.role_in_org == "owner",
+            )
+        )
+        if not member_check.first():
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only organization owner can add members",
+            )
+
+    existing = await db.execute(
         select(org_members).where(
-            org_members.c.user_id == current_user.id,
+            org_members.c.user_id == body.user_id,
             org_members.c.organization_id == org_id,
-            org_members.c.role_in_org == "owner",
         )
     )
-    if not member_check.first():
+    if existing.first():
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only organization owner can add members",
+            status_code=status.HTTP_409_CONFLICT,
+            detail="User is already a member of this organization",
         )
 
     stmt = org_members.insert().values(
@@ -265,3 +271,120 @@ async def add_member(
     await db.commit()
 
     return {"detail": "Member added"}
+
+
+@router.get("/{org_id}/members")
+async def list_members(
+    org_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    org = await db.execute(select(Organization).where(Organization.id == org_id))
+    if not org.scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found"
+        )
+
+    result = await db.execute(
+        select(org_members.c.user_id, org_members.c.role_in_org, User.full_name, User.email)
+        .join(User, User.id == org_members.c.user_id)
+        .where(org_members.c.organization_id == org_id)
+    )
+    members = [
+        {"user_id": str(r[0]), "role_in_org": r[1], "full_name": r[2], "email": r[3]}
+        for r in result.all()
+    ]
+    return {"items": members}
+
+
+@router.patch("/{org_id}/members/{user_id}")
+async def update_member_role(
+    org_id: uuid.UUID,
+    user_id: uuid.UUID,
+    body: UpdateMemberRoleRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    is_admin = current_user.role in ("nti_admin", "super_admin")
+    if not is_admin:
+        owner_check = await db.execute(
+            select(org_members).where(
+                org_members.c.user_id == current_user.id,
+                org_members.c.organization_id == org_id,
+                org_members.c.role_in_org == "owner",
+            )
+        )
+        if not owner_check.first():
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only organization owner can change member roles",
+            )
+
+    result = await db.execute(
+        select(org_members).where(
+            org_members.c.user_id == user_id,
+            org_members.c.organization_id == org_id,
+        )
+    )
+    if not result.first():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Member not found in this organization",
+        )
+
+    stmt = (
+        org_members.update()
+        .where(
+            org_members.c.user_id == user_id,
+            org_members.c.organization_id == org_id,
+        )
+        .values(role_in_org=body.role_in_org)
+    )
+    await db.execute(stmt)
+    await db.commit()
+
+    return {"detail": "Member role updated"}
+
+
+@router.delete("/{org_id}/members/{user_id}")
+async def remove_member(
+    org_id: uuid.UUID,
+    user_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    is_admin = current_user.role in ("nti_admin", "super_admin")
+    if not is_admin:
+        owner_check = await db.execute(
+            select(org_members).where(
+                org_members.c.user_id == current_user.id,
+                org_members.c.organization_id == org_id,
+                org_members.c.role_in_org == "owner",
+            )
+        )
+        if not owner_check.first():
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only organization owner can remove members",
+            )
+
+    member = await db.execute(
+        select(org_members).where(
+            org_members.c.user_id == user_id,
+            org_members.c.organization_id == org_id,
+        )
+    )
+    if not member.first():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Member not found in this organization",
+        )
+
+    stmt = org_members.delete().where(
+        org_members.c.user_id == user_id,
+        org_members.c.organization_id == org_id,
+    )
+    await db.execute(stmt)
+    await db.commit()
+
+    return {"detail": "Member removed"}
