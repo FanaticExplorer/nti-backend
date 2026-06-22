@@ -22,6 +22,7 @@ from sqlalchemy.orm import selectinload
 from app.database import get_db
 from app.dependencies import get_current_user, require_role
 from app.models.application import Application
+from app.models.application_comment import ApplicationComment
 from app.models.notification import Notification
 from app.models.user import User
 from app.schemas.auth import UserOut
@@ -225,11 +226,27 @@ async def anonymize_my_account(
     db: AsyncSession = Depends(get_db),
 ):
     user = current_user
+
+    apps_result = await db.execute(
+        select(Application).where(Application.applicant_id == user.id)
+    )
+    for app in apps_result.scalars().all():
+        app.form_data = {}
+
+    comments_result = await db.execute(
+        select(ApplicationComment).where(ApplicationComment.user_id == user.id)
+    )
+    for c in comments_result.scalars().all():
+        c.body = "[anonymized]"
+
+    if user.student_profile:
+        user.student_profile.bio = None
+        user.student_profile.skills = None
+
     user.email = f"anonymized_{user.id}@deleted.nti.sk"
     user.full_name = "Deleted User"
     user.hashed_password = ""
     user.is_active = False
-    await db.commit()
 
     await write_audit_log(
         db,
@@ -239,5 +256,7 @@ async def anonymize_my_account(
         str(user.id),
         ip_address=get_client_ip(request),
     )
+
+    await db.commit()
 
     return {"detail": "Account anonymized"}
