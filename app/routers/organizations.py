@@ -279,11 +279,26 @@ async def list_members(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    org = await db.execute(select(Organization).where(Organization.id == org_id))
-    if not org.scalar_one_or_none():
+    org_result = await db.execute(select(Organization).where(Organization.id == org_id))
+    org = org_result.scalar_one_or_none()
+    if not org:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Organization not found"
         )
+
+    is_admin = current_user.role in ("nti_admin", "super_admin")
+    if not is_admin:
+        member_check = await db.execute(
+            select(org_members).where(
+                org_members.c.user_id == current_user.id,
+                org_members.c.organization_id == org_id,
+            )
+        )
+        if not member_check.first():
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied",
+            )
 
     result = await db.execute(
         select(org_members.c.user_id, org_members.c.role_in_org, User.full_name, User.email)
