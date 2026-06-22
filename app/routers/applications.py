@@ -521,6 +521,15 @@ async def change_application_status(
             ts.status = "assigned"
             await db.commit()
 
+        if ts and ts.product_owner_id:
+            await create_notification(
+                db, ts.product_owner_id,
+                "Team selected for your tech spec",
+                f"A team has been selected for '{ts.title}'.",
+                "team_selected",
+                "tech_spec", str(ts.id),
+            )
+
     await write_audit_log(
         db,
         current_user.id,
