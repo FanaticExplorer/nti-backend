@@ -138,3 +138,21 @@ async def test_add_comment_creates_notification(
     )
     notifs = r_notif.json()["items"]
     assert any(n["action_type"] == "comment_added" for n in notifs)
+
+
+@pytest.mark.asyncio
+async def test_internal_comment_does_not_notify_applicant(
+    client: AsyncClient, application, evaluator
+):
+    r = await client.post(
+        f"/applications/{application.id}/comments",
+        json={"body": "Internal note", "is_internal": True},
+        headers=auth_headers(evaluator),
+    )
+    assert r.status_code == 201
+
+    r_notif = await client.get(
+        "/notifications", headers=auth_headers(application.applicant)
+    )
+    notifs = r_notif.json()["items"]
+    assert not any(n["action_type"] == "comment_added" for n in notifs)

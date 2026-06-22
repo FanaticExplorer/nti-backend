@@ -14,7 +14,7 @@ async def test_export_my_data(client: AsyncClient, student):
     assert data["user"]["full_name"] == student.full_name
     assert "applications" in data
     assert "organizations" in data
-    assert "notifications_count" in data
+    assert "notifications" in data
     assert "exported_at" in data
 
 

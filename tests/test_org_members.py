@@ -107,3 +107,14 @@ async def test_add_member_as_admin(client: AsyncClient, organization, nti_admin,
         headers=auth_headers(nti_admin),
     )
     assert r.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_list_members_denied_for_non_member(
+    client: AsyncClient, organization, student
+):
+    r = await client.get(
+        f"/organizations/{organization.id}/members",
+        headers=auth_headers(student),
+    )
+    assert r.status_code == 403
