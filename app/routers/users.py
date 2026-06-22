@@ -24,6 +24,7 @@ from app.dependencies import get_current_user, require_role
 from app.models.application import Application
 from app.models.application_comment import ApplicationComment
 from app.models.notification import Notification
+from app.models.student_profile import StudentProfile
 from app.models.user import User
 from app.schemas.auth import UserOut
 from app.schemas.user import UserListOut, UserUpdateRole
@@ -249,9 +250,13 @@ async def anonymize_my_account(
     for c in comments_result.scalars().all():
         c.body = "[anonymized]"
 
-    if user.student_profile:
-        user.student_profile.bio = None
-        user.student_profile.skills = None
+    profile_result = await db.execute(
+        select(StudentProfile).where(StudentProfile.user_id == user.id)
+    )
+    profile = profile_result.scalar_one_or_none()
+    if profile:
+        profile.bio = None
+        profile.skills = None
 
     user.email = f"anonymized_{user.id}@deleted.nti.sk"
     user.full_name = "Deleted User"
