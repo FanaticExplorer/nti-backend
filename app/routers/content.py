@@ -16,6 +16,7 @@ lookup for editors.
 """
 
 import uuid
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
 from fastapi.responses import Response
@@ -239,6 +240,8 @@ async def create_news_article(
 
     data = body.model_dump()
     data["body"] = sanitize_html(data["body"])
+    if data.get("is_published") and not data.get("published_at"):
+        data["published_at"] = datetime.now(timezone.utc)
     article = NewsArticle(
         author_id=current_user.id,
         **data,
@@ -274,6 +277,8 @@ async def update_news_article(
     update_data = body.model_dump(exclude_unset=True)
     if "body" in update_data:
         update_data["body"] = sanitize_html(update_data["body"])
+    if update_data.get("is_published") and not article.published_at:
+        update_data["published_at"] = datetime.now(timezone.utc)
     for key, value in update_data.items():
         setattr(article, key, value)
     await db.commit()
