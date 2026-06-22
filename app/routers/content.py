@@ -439,7 +439,8 @@ async def delete_faq(
 
 
 @router.get("/sitemap.xml")
-async def sitemap(db: AsyncSession = Depends(get_db)):
+async def sitemap(request: Request, db: AsyncSession = Depends(get_db)):
+    base = str(request.base_url).rstrip("/")
     pages = (await db.execute(
         select(ContentPage.slug).where(ContentPage.is_published)
     )).all()
@@ -452,11 +453,11 @@ async def sitemap(db: AsyncSession = Depends(get_db)):
 
     urls = []
     for slug in pages:
-        urls.append(f"<url><loc>/pages/{slug[0]}</loc></url>")
+        urls.append(f"<url><loc>{base}/pages/{slug[0]}</loc></url>")
     for slug in news:
-        urls.append(f"<url><loc>/news/{slug[0]}</loc></url>")
+        urls.append(f"<url><loc>{base}/news/{slug[0]}</loc></url>")
     for pid in programs:
-        urls.append(f"<url><loc>/programs/{pid[0]}</loc></url>")
+        urls.append(f"<url><loc>{base}/programs/{pid[0]}</loc></url>")
 
     xml = (
         '<?xml version="1.0" encoding="UTF-8"?>'
