@@ -68,6 +68,7 @@ async def _firm_owns_tech_spec(
 
 @router.post("", response_model=TechSpecOut, status_code=status.HTTP_201_CREATED)
 async def create_tech_spec(
+    request: Request,
     body: TechSpecCreate,
     current_user: User = Depends(require_role("firm")),
     db: AsyncSession = Depends(get_db),
@@ -102,6 +103,17 @@ async def create_tech_spec(
     db.add(ts)
     await db.commit()
     await db.refresh(ts)
+
+    await write_audit_log(
+        db,
+        current_user.id,
+        "tech_spec.created",
+        "tech_spec",
+        str(ts.id),
+        {"title": ts.title, "organization_id": str(ts.organization_id)},
+        ip_address=get_client_ip(request),
+    )
+
     return ts
 
 
@@ -324,6 +336,7 @@ async def change_tech_spec_status(
 
 @router.delete("/{tech_spec_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_tech_spec(
+    request: Request,
     tech_spec_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -360,6 +373,16 @@ async def delete_tech_spec(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Cannot delete tech spec with linked applications",
         )
+
+    await write_audit_log(
+        db,
+        current_user.id,
+        "tech_spec.deleted",
+        "tech_spec",
+        str(tech_spec_id),
+        {"title": ts.title},
+        ip_address=get_client_ip(request),
+    )
 
     await db.delete(ts)
     await db.commit()
