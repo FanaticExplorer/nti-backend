@@ -70,17 +70,32 @@ async def create_organization(
 async def list_organizations(
     skip: int = 0,
     limit: int = 20,
-    current_user: User = Depends(require_role("nti_admin", "super_admin")),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """
-    Return a paginated list of all organizations.
+    is_admin = current_user.role in ("nti_admin", "super_admin")
+    is_firm = current_user.role == "firm"
+    if not (is_admin or is_firm):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Requires nti_admin, super_admin, or firm role",
+        )
 
-    **Access**: ``nti_admin``, ``super_admin``
-    """
-    result = await db.execute(select(Organization).offset(skip).limit(limit))
+    if is_admin:
+        query = select(Organization)
+        count_query = select(func.count(Organization.id))
+    else:
+        member_org_ids = select(org_members.c.organization_id).where(
+            org_members.c.user_id == current_user.id
+        )
+        query = select(Organization).where(Organization.id.in_(member_org_ids))
+        count_query = select(func.count(Organization.id)).where(
+            Organization.id.in_(member_org_ids)
+        )
+
+    result = await db.execute(query.offset(skip).limit(limit))
     orgs = result.scalars().all()
-    total_result = await db.execute(select(func.count(Organization.id)))
+    total_result = await db.execute(count_query)
     total = total_result.scalar() or 0
 
     return {
