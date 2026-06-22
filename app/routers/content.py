@@ -18,6 +18,7 @@ lookup for editors.
 import uuid
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
+from fastapi.responses import Response
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -26,6 +27,7 @@ from app.dependencies import require_role
 from app.models.contact_message import ContactMessage
 from app.models.content import ContentPage, NewsArticle
 from app.models.faq import FAQ
+from app.models.program import Program
 from app.models.user import User
 from app.schemas.contact import ContactMessageCreate, ContactMessageOut
 from app.schemas.content import (
@@ -431,3 +433,35 @@ async def delete_faq(
 
     await db.delete(faq)
     await db.commit()
+
+
+# ── Sitemap ──
+
+
+@router.get("/sitemap.xml")
+async def sitemap(db: AsyncSession = Depends(get_db)):
+    pages = (await db.execute(
+        select(ContentPage.slug).where(ContentPage.is_published)
+    )).all()
+    news = (await db.execute(
+        select(NewsArticle.slug).where(NewsArticle.is_published)
+    )).all()
+    programs = (await db.execute(
+        select(Program.id).where(Program.is_active)
+    )).all()
+
+    urls = []
+    for slug in pages:
+        urls.append(f"<url><loc>/pages/{slug[0]}</loc></url>")
+    for slug in news:
+        urls.append(f"<url><loc>/news/{slug[0]}</loc></url>")
+    for pid in programs:
+        urls.append(f"<url><loc>/programs/{pid[0]}</loc></url>")
+
+    xml = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+        + "".join(urls)
+        + "</urlset>"
+    )
+    return Response(content=xml, media_type="application/xml")
