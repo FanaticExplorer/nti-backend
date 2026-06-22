@@ -23,7 +23,6 @@ from app.database import get_db
 from app.dependencies import get_current_user, require_role
 from app.models.application import Application
 from app.models.notification import Notification
-from app.models.student_profile import StudentProfile
 from app.models.user import User
 from app.schemas.auth import UserOut
 from app.schemas.user import UserListOut, UserUpdateRole
@@ -193,8 +192,8 @@ async def export_my_data(
         "student_profile": (
             {
                 "university": user.student_profile.university,
-                "field_of_study": user.student_profile.field_of_study,
-                "year": user.student_profile.year,
+                "study_program": user.student_profile.study_program,
+                "year_of_study": user.student_profile.year_of_study,
                 "bio": user.student_profile.bio,
             }
             if user.student_profile
