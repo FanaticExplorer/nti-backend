@@ -214,7 +214,17 @@ async def export_my_data(
         "organizations": [
             {"id": str(o.id), "name": o.name} for o in user.organizations
         ],
-        "notifications_count": len(notifications),
+        "notifications": [
+            {
+                "id": str(n.id),
+                "title": n.title,
+                "body": n.body,
+                "action_type": n.action_type,
+                "is_read": n.is_read,
+                "created_at": n.created_at.isoformat(),
+            }
+            for n in notifications
+        ],
         "exported_at": datetime.now(timezone.utc).isoformat(),
     }
 
