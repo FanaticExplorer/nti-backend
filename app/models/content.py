@@ -21,7 +21,7 @@ class ContentPage(Base):
     body: Mapped[str] = mapped_column(Text, nullable=False)
     meta_title: Mapped[str | None] = mapped_column(String(255), nullable=True)
     meta_description: Mapped[str | None] = mapped_column(String(500), nullable=True)
-    og_image_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    og_image: Mapped[str | None] = mapped_column(String(500), nullable=True)
     is_published: Mapped[bool] = mapped_column(Boolean, default=False)
     created_by: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id"), nullable=False

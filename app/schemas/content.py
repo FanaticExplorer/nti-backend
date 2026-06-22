@@ -11,7 +11,7 @@ class ContentPageCreate(BaseModel):
     body: str
     meta_title: Optional[str] = None
     meta_description: Optional[str] = None
-    og_image_url: Optional[str] = None
+    og_image: Optional[str] = None
     is_published: bool = False
 
 
@@ -20,7 +20,7 @@ class ContentPageUpdate(BaseModel):
     body: Optional[str] = None
     meta_title: Optional[str] = None
     meta_description: Optional[str] = None
-    og_image_url: Optional[str] = None
+    og_image: Optional[str] = None
     is_published: Optional[bool] = None
 
 
@@ -31,7 +31,7 @@ class ContentPageOut(BaseModel):
     body: str
     meta_title: Optional[str]
     meta_description: Optional[str]
-    og_image_url: Optional[str]
+    og_image: Optional[str]
     is_published: bool
     created_by: UUID
     updated_at: datetime

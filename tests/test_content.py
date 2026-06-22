@@ -91,7 +91,7 @@ async def test_get_published_page_returns_seo_fields(
             "body": "Content",
             "meta_title": "Custom Meta",
             "meta_description": "Custom description",
-            "og_image_url": "https://example.com/img.png",
+            "og_image": "https://example.com/img.png",
             "is_published": True,
         },
         headers=auth_headers(content_editor),
@@ -101,7 +101,7 @@ async def test_get_published_page_returns_seo_fields(
     data = r.json()
     assert data["meta_title"] == "Custom Meta"
     assert data["meta_description"] == "Custom description"
-    assert data["og_image_url"] == "https://example.com/img.png"
+    assert data["og_image"] == "https://example.com/img.png"
 
 
 # ── News ──
