@@ -23,7 +23,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.dependencies import require_role
+from app.dependencies import get_current_user_optional, require_role
 from app.models.contact_message import ContactMessage
 from app.models.content import ContentPage, NewsArticle
 from app.models.faq import FAQ
@@ -54,20 +54,23 @@ router = APIRouter(prefix="/content", tags=["content"])
 async def list_pages(
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
+    current_user: User | None = Depends(get_current_user_optional),
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Return a paginated list of published content pages.
+    Return a paginated list of content pages.
 
-    Only pages where ``is_published == True`` are returned.
-
-    **Access**: public
+    Published-only for public; includes unpublished for editors/admins.
     """
-    result = await db.execute(
-        select(ContentPage).where(ContentPage.is_published).offset(skip).limit(limit)
-    )
+    is_admin = current_user and current_user.role in ("content_editor", "nti_admin", "super_admin")
+    query = select(ContentPage)
+    count_query = select(func.count(ContentPage.id))
+    if not is_admin:
+        query = query.where(ContentPage.is_published)
+        count_query = count_query.where(ContentPage.is_published)
+    result = await db.execute(query.offset(skip).limit(limit))
     pages = result.scalars().all()
-    total_result = await db.execute(select(func.count(ContentPage.id)).where(ContentPage.is_published))
+    total_result = await db.execute(count_query)
     total = total_result.scalar_one()
     return {
         "items": [ContentPageOut.model_validate(p) for p in pages],
@@ -171,26 +174,18 @@ async def update_page(
 async def list_news(
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
+    current_user: User | None = Depends(get_current_user_optional),
     db: AsyncSession = Depends(get_db),
 ):
-    """
-    Return a paginated list of published news articles.
-
-    Only articles where ``is_published == True`` are returned, ordered
-    by ``published_at`` descending (newest first). Articles with a null
-    ``published_at`` are placed at the end.
-
-    **Access**: public
-    """
-    result = await db.execute(
-        select(NewsArticle)
-        .where(NewsArticle.is_published)
-        .order_by(NewsArticle.published_at.desc().nullslast())
-        .offset(skip)
-        .limit(limit)
-    )
+    is_admin = current_user and current_user.role in ("content_editor", "nti_admin", "super_admin")
+    query = select(NewsArticle).order_by(NewsArticle.published_at.desc().nullslast())
+    count_query = select(func.count(NewsArticle.id))
+    if not is_admin:
+        query = query.where(NewsArticle.is_published)
+        count_query = count_query.where(NewsArticle.is_published)
+    result = await db.execute(query.offset(skip).limit(limit))
     articles = result.scalars().all()
-    total_result = await db.execute(select(func.count(NewsArticle.id)).where(NewsArticle.is_published))
+    total_result = await db.execute(count_query)
     total = total_result.scalar_one()
     return {
         "items": [NewsArticleOut.model_validate(a) for a in articles],
@@ -368,13 +363,13 @@ async def toggle_contact_message_read(
 @router.get("/faq")
 async def list_faq(
     category: str | None = Query(None),
+    current_user: User | None = Depends(get_current_user_optional),
     db: AsyncSession = Depends(get_db),
 ):
-    query = (
-        select(FAQ)
-        .where(FAQ.is_published)
-        .order_by(FAQ.sort_order)
-    )
+    is_admin = current_user and current_user.role in ("content_editor", "nti_admin", "super_admin")
+    query = select(FAQ).order_by(FAQ.sort_order)
+    if not is_admin:
+        query = query.where(FAQ.is_published)
     if category:
         query = query.where(FAQ.category == category)
 
