@@ -9,11 +9,17 @@ services:
       - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nti -d nti_db"]
+      interval: 2s
+      timeout: 5s
+      retries: 10
 
   app:
     build: .
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     ports:
       - "8000:8000"
     volumes:
