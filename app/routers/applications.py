@@ -681,13 +681,14 @@ async def add_application_comment(
         ip_address=get_client_ip(request),
     )
 
-    await create_notification(
-        db, app.applicant_id,
-        "New comment",
-        "A new comment has been added to your application.",
-        "comment_added",
-        "application", str(application_id),
-    )
+    if not body.is_internal:
+        await create_notification(
+            db, app.applicant_id,
+            "New comment",
+            "A new comment has been added to your application.",
+            "comment_added",
+            "application", str(application_id),
+        )
 
     return ApplicationCommentOut(
         id=comment.id,
