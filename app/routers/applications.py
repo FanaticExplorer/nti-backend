@@ -160,6 +160,7 @@ async def get_my_applications(
     """
     result = await db.execute(
         select(Application)
+        .options(selectinload(Application.call).selectinload(Call.program), selectinload(Application.team), selectinload(Application.applicant))
         .where(Application.applicant_id == current_user.id)
         .offset(skip)
         .limit(limit)
@@ -170,7 +171,7 @@ async def get_my_applications(
     )
     total = total_result.scalar() or 0
     return {
-        "items": [ApplicationOut.model_validate(a) for a in apps],
+        "items": [ApplicationDetailOut.model_validate(a) for a in apps],
         "total": total,
         "skip": skip,
         "limit": limit,
@@ -195,7 +196,11 @@ async def list_applications(
 
     **Access**: ``nti_admin``, ``evaluator``, ``mentor``
     """
-    query = select(Application)
+    query = select(Application).options(
+        selectinload(Application.call).selectinload(Call.program),
+        selectinload(Application.team),
+        selectinload(Application.applicant),
+    )
     if status_filter:
         query = query.where(Application.status == status_filter)
     if call_id:
@@ -213,7 +218,7 @@ async def list_applications(
     total = (await db.execute(count_query)).scalar() or 0
 
     return {
-        "items": [ApplicationOut.model_validate(a) for a in apps],
+        "items": [ApplicationDetailOut.model_validate(a) for a in apps],
         "total": total,
         "skip": skip,
         "limit": limit,
@@ -239,7 +244,7 @@ async def get_application(
     result = await db.execute(
         select(Application)
         .options(
-            selectinload(Application.call),
+            selectinload(Application.call).selectinload(Call.program),
             selectinload(Application.team),
             selectinload(Application.applicant),
         )
@@ -338,6 +343,11 @@ async def submit_application(
     if not call:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Call not found"
+        )
+    if call.status not in ("open", "matching"):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=f"Cannot submit to a call with status '{call.status}'. Call must be open or matching.",
         )
 
     program_result = await db.execute(
