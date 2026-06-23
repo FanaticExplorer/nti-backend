@@ -16,8 +16,14 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import StreamingResponse
+from openpyxl import Workbook
+from reportlab.lib.pagesizes import A4
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib import colors
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.database import get_db
 from app.dependencies import require_role
@@ -152,7 +158,7 @@ async def get_audit_log(
 
     **Access**: ``super_admin`` only
     """
-    query = select(AuditLog)
+    query = select(AuditLog).options(selectinload(AuditLog.user))
     count_query = select(func.count(AuditLog.id))
 
     if action:
@@ -187,6 +193,7 @@ async def get_audit_log(
                 "details": log.details,
                 "ip_address": log.ip_address,
                 "created_at": log.created_at,
+                "user": {"email": log.user.email, "full_name": log.user.full_name} if log.user else None,
             }
             for log in logs
         ],
@@ -197,18 +204,18 @@ async def get_audit_log(
 
 
 @router.get("/export/applications")
-async def export_applications_csv(
+async def export_applications(
     request: Request,
     call_id: uuid.UUID | None = Query(None),
+    format: str = Query("csv", pattern="^(csv|xlsx|pdf)$"),
     current_user: User = Depends(require_role("nti_admin", "super_admin")),
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Export applications as a downloadable CSV file.
+    Export applications as a downloadable CSV or XLSX file.
 
     Optionally filter by **call_id** to export applications for a specific call.
-    The response is a ``StreamingResponse`` with ``Content-Disposition`` header
-    set to trigger a file download.
+    Use **format=xlsx** for Excel format.
 
     An audit log entry is written each time an export is triggered.
 
@@ -222,50 +229,96 @@ async def export_applications_csv(
     result = await db.execute(query)
     apps = result.scalars().all()
 
-    output = io.StringIO()
-    writer = csv.writer(output)
+    headers_row = [
+        "id", "call_id", "team_id", "applicant_id", "status",
+        "is_draft", "submitted_at", "created_at", "updated_at"
+    ]
 
-    # Header row
-    writer.writerow(
-        [
-            "id",
-            "call_id",
-            "team_id",
-            "applicant_id",
-            "status",
-            "is_draft",
-            "submitted_at",
-            "created_at",
-            "updated_at",
-        ]
-    )
-
-    # Data rows
+    rows = []
     for app in apps:
-        writer.writerow(
-            [
-                str(app.id),
-                str(app.call_id),
-                str(app.team_id) if app.team_id else "",
-                str(app.applicant_id),
-                app.status,
-                app.is_draft,
-                app.submitted_at.isoformat() if app.submitted_at else "",
-                app.created_at.isoformat() if app.created_at else "",
-                app.updated_at.isoformat() if app.updated_at else "",
-            ]
+        rows.append([
+            str(app.id),
+            str(app.call_id),
+            str(app.team_id) if app.team_id else "",
+            str(app.applicant_id),
+            app.status,
+            str(app.is_draft),
+            app.submitted_at.isoformat() if app.submitted_at else "",
+            app.created_at.isoformat() if app.created_at else "",
+            app.updated_at.isoformat() if app.updated_at else "",
+        ])
+
+    ts = datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')
+
+    if format == "xlsx":
+        wb = Workbook()
+        ws = wb.active
+        ws.append(headers_row)
+        for row in rows:
+            ws.append(row)
+        output = io.BytesIO()
+        wb.save(output)
+        output.seek(0)
+        filename = f"applications_export_{ts}.xlsx"
+        media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+        await write_audit_log(
+            db, current_user.id, "export.triggered", "application", "xlsx_export",
+            {"call_id": str(call_id) if call_id else None, "count": len(apps)},
+            ip_address=get_client_ip(request),
         )
 
-    output.seek(0)
-    filename = f"applications_export_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.csv"
+        return StreamingResponse(
+            iter([output.getvalue()]),
+            media_type=media_type,
+            headers={"Content-Disposition": f"attachment; filename={filename}"},
+        )
 
-    # Audit
+    if format == "pdf":
+        buf = io.BytesIO()
+        doc = SimpleDocTemplate(buf, pagesize=A4)
+        styles = getSampleStyleSheet()
+
+        data = [headers_row]
+        for row in rows:
+            data.append(row)
+
+        table = Table(data)
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#3b82f6')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('FONTSIZE', (0, 0), (-1, -1), 8),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#f8f9fa')]),
+        ]))
+
+        doc.build([table])
+        buf.seek(0)
+        filename = f"applications_export_{ts}.pdf"
+
+        await write_audit_log(
+            db, current_user.id, "export.triggered", "application", "pdf_export",
+            {"call_id": str(call_id) if call_id else None, "count": len(apps)},
+            ip_address=get_client_ip(request),
+        )
+
+        return StreamingResponse(
+            iter([buf.getvalue()]),
+            media_type="application/pdf",
+            headers={"Content-Disposition": f"attachment; filename={filename}"},
+        )
+
+    # CSV
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(headers_row)
+    for row in rows:
+        writer.writerow(row)
+    output.seek(0)
+    filename = f"applications_export_{ts}.csv"
+
     await write_audit_log(
-        db,
-        current_user.id,
-        "export.triggered",
-        "application",
-        "csv_export",
+        db, current_user.id, "export.triggered", "application", "csv_export",
         {"call_id": str(call_id) if call_id else None, "count": len(apps)},
         ip_address=get_client_ip(request),
     )
