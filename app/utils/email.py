@@ -50,11 +50,12 @@ async def _send(to: str, subject: str, body: str) -> None:
         print(f"[EMAIL] Body: {body}")
 
 
-async def send_welcome_email(to: str) -> None:
+async def send_welcome_email(to: str, verification_token: str) -> None:
+    link = f"{settings.FRONTEND_URL}/verify-email?token={verification_token}"
     await _send(
         to,
         "Welcome to NTI — please verify your email",
-        "<p>Welcome! Please verify your email by clicking the link in the verification email.</p>",
+        f"<p>Welcome! Please verify your email by clicking the link below:</p><p><a href='{link}'>Verify Email</a></p>",
     )
 
 
@@ -104,8 +105,9 @@ async def send_organization_approved(to: str) -> None:
 
 
 async def send_password_reset(to: str, token: str) -> None:
+    link = f"{settings.FRONTEND_URL}/reset-password?token={token}"
     await _send(
         to,
         "Password reset request",
-        f"<p>Click the link to reset your password: /reset-password?token={token}</p>",
+        f"<p>Click the link to reset your password:</p><p><a href='{link}'>Reset Password</a></p>",
     )

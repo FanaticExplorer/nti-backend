@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     MAIL_SSL_TLS: bool = False
 
     CORS_ORIGINS: str = "http://localhost:5173,http://localhost:3000"
+    FRONTEND_URL: str = "http://localhost:5173"
     MAX_UPLOAD_SIZE_MB: int = 10
     UPLOAD_DIR: str = "uploads"
 

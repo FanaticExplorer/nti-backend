@@ -37,6 +37,7 @@ from app.schemas.auth import (
 )
 from app.utils.email import send_password_reset, send_welcome_email
 from app.utils.notifications import create_notification
+from app.utils.sanitize import sanitize_html
 from app.utils.security import (
     create_access_token,
     create_refresh_token,
@@ -78,7 +79,7 @@ async def register(
         id=uuid.uuid4(),
         email=body.email,
         hashed_password=hash_password(body.password),
-        full_name=body.full_name,
+        full_name=sanitize_html(body.full_name),
         role=body.role,
         gdpr_consent=body.gdpr_consent,
         gdpr_consent_at=datetime.now(timezone.utc) if body.gdpr_consent else None,
@@ -87,7 +88,8 @@ async def register(
     await db.commit()
     await db.refresh(user)
 
-    background_tasks.add_task(send_welcome_email, user.email)
+    verification_token = create_access_token({"sub": str(user.id), "purpose": "email_verification"})
+    background_tasks.add_task(send_welcome_email, user.email, verification_token)
 
     await create_notification(
         db, user.id,
