@@ -15,9 +15,10 @@ least 3 members with student profiles are required.
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.database import get_db
 from app.dependencies import get_current_user, require_role
@@ -41,6 +42,32 @@ def _user_out(user: User) -> dict:
         "full_name": user.full_name,
         "role": user.role,
     }
+
+
+@router.get("")
+async def list_teams(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    current_user: User = Depends(require_role("student", "team_leader")),
+    db: AsyncSession = Depends(get_db),
+):
+    query = select(Team).options(selectinload(Team.leader)).offset(skip).limit(limit)
+    result = await db.execute(query)
+    teams = result.scalars().all()
+    total = (await db.execute(select(func.count(Team.id)))).scalar_one()
+
+    items = []
+    for t in teams:
+        member_count = (await db.execute(
+            select(func.count()).where(team_members.c.team_id == t.id)
+        )).scalar_one()
+        items.append({
+            **TeamOut.model_validate(t).model_dump(),
+            "leader_name": t.leader.full_name if t.leader else None,
+            "member_count": member_count,
+        })
+
+    return {"items": items, "total": total, "skip": skip, "limit": limit}
 
 
 @router.post("", response_model=TeamOut, status_code=status.HTTP_201_CREATED)

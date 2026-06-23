@@ -265,9 +265,17 @@ async def add_member(
                 detail="Only organization owner can add members",
             )
 
+    # Resolve email to user
+    invited = await db.execute(select(User).where(User.email == body.email))
+    invited_user = invited.scalar_one_or_none()
+    if not invited_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
+
     existing = await db.execute(
         select(org_members).where(
-            org_members.c.user_id == body.user_id,
+            org_members.c.user_id == invited_user.id,
             org_members.c.organization_id == org_id,
         )
     )
@@ -278,7 +286,7 @@ async def add_member(
         )
 
     stmt = org_members.insert().values(
-        user_id=body.user_id,
+        user_id=invited_user.id,
         organization_id=org_id,
         role_in_org=body.role_in_org,
     )

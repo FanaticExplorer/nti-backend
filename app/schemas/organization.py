@@ -38,7 +38,7 @@ class OrganizationUpdate(BaseModel):
 
 
 class AddMemberRequest(BaseModel):
-    user_id: UUID
+    email: str
     role_in_org: str = Field(default="member", pattern="^(admin|member|product_owner)$")
 
 

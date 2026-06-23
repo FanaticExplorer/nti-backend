@@ -24,6 +24,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.config import settings
 from app.dependencies import get_current_user_optional, require_role
 from app.models.contact_message import ContactMessage
 from app.models.content import ContentPage, NewsArticle
@@ -439,8 +440,8 @@ async def delete_faq(
 
 
 @router.get("/sitemap.xml")
-async def sitemap(request: Request, db: AsyncSession = Depends(get_db)):
-    base = str(request.base_url).rstrip("/")
+async def sitemap(db: AsyncSession = Depends(get_db)):
+    base = settings.FRONTEND_URL.rstrip("/")
     pages = (await db.execute(
         select(ContentPage.slug).where(ContentPage.is_published)
     )).all()

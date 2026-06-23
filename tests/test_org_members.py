@@ -20,7 +20,7 @@ async def test_list_members(client: AsyncClient, organization, firm_user):
 async def test_add_member_as_owner(client: AsyncClient, organization, firm_user, student):
     r = await client.post(
         f"/organizations/{organization.id}/members",
-        json={"user_id": str(student.id), "role_in_org": "member"},
+        json={"email": student.email, "role_in_org": "member"},
         headers=auth_headers(firm_user),
     )
     assert r.status_code == 200
@@ -36,12 +36,12 @@ async def test_add_member_as_owner(client: AsyncClient, organization, firm_user,
 async def test_add_member_duplicate(client: AsyncClient, organization, firm_user, student):
     await client.post(
         f"/organizations/{organization.id}/members",
-        json={"user_id": str(student.id), "role_in_org": "member"},
+        json={"email": student.email, "role_in_org": "member"},
         headers=auth_headers(firm_user),
     )
     r = await client.post(
         f"/organizations/{organization.id}/members",
-        json={"user_id": str(student.id), "role_in_org": "member"},
+        json={"email": student.email, "role_in_org": "member"},
         headers=auth_headers(firm_user),
     )
     assert r.status_code == 409
@@ -51,7 +51,7 @@ async def test_add_member_duplicate(client: AsyncClient, organization, firm_user
 async def test_add_member_invalid_role(client: AsyncClient, organization, firm_user, student):
     r = await client.post(
         f"/organizations/{organization.id}/members",
-        json={"user_id": str(student.id), "role_in_org": "superhero"},
+        json={"email": student.email, "role_in_org": "superhero"},
         headers=auth_headers(firm_user),
     )
     assert r.status_code == 422
@@ -61,7 +61,7 @@ async def test_add_member_invalid_role(client: AsyncClient, organization, firm_u
 async def test_update_member_role(client: AsyncClient, organization, firm_user, student):
     await client.post(
         f"/organizations/{organization.id}/members",
-        json={"user_id": str(student.id), "role_in_org": "member"},
+        json={"email": student.email, "role_in_org": "member"},
         headers=auth_headers(firm_user),
     )
     r = await client.patch(
@@ -83,7 +83,7 @@ async def test_update_member_role(client: AsyncClient, organization, firm_user, 
 async def test_remove_member(client: AsyncClient, organization, firm_user, student):
     await client.post(
         f"/organizations/{organization.id}/members",
-        json={"user_id": str(student.id), "role_in_org": "member"},
+        json={"email": student.email, "role_in_org": "member"},
         headers=auth_headers(firm_user),
     )
     r = await client.delete(
@@ -103,7 +103,7 @@ async def test_remove_member(client: AsyncClient, organization, firm_user, stude
 async def test_add_member_as_admin(client: AsyncClient, organization, nti_admin, student):
     r = await client.post(
         f"/organizations/{organization.id}/members",
-        json={"user_id": str(student.id), "role_in_org": "product_owner"},
+        json={"email": student.email, "role_in_org": "product_owner"},
         headers=auth_headers(nti_admin),
     )
     assert r.status_code == 200

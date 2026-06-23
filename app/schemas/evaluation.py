@@ -7,18 +7,18 @@ from pydantic import BaseModel, Field
 
 class EvaluationCreate(BaseModel):
     application_id: UUID
-    score: Optional[float] = None
+    score: Optional[float] = Field(None, ge=0, le=10)
     recommendation: Optional[str] = Field(
-        None, pattern="^(approve|reject|request_revision)$"
+        None, pattern="^(approve|reject|request_revision|revision)$"
     )
     comment: Optional[str] = None
     internal_notes: Optional[str] = None
 
 
 class EvaluationUpdate(BaseModel):
-    score: Optional[float] = None
+    score: Optional[float] = Field(None, ge=0, le=10)
     recommendation: Optional[str] = Field(
-        None, pattern="^(approve|reject|request_revision)$"
+        None, pattern="^(approve|reject|request_revision|revision)$"
     )
     comment: Optional[str] = None
     internal_notes: Optional[str] = None

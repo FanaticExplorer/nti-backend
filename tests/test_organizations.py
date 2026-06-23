@@ -61,7 +61,7 @@ async def test_add_member_to_org(client: AsyncClient, firm_user, organization, s
     r = await client.post(
         f"/organizations/{organization.id}/members",
         json={
-            "user_id": str(student.id),
+            "email": student.email,
             "role_in_org": "member",
         },
         headers=auth_headers(firm_user),

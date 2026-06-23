@@ -12,7 +12,7 @@ async def test_create_evaluation(client: AsyncClient, evaluator, application):
         "/evaluations",
         json={
             "application_id": str(application.id),
-            "score": 85.0,
+            "score": 8.5,
             "recommendation": "approve",
             "comment": "Looks good",
         },
@@ -27,7 +27,7 @@ async def test_get_evaluations(client: AsyncClient, evaluator, application):
         "/evaluations",
         json={
             "application_id": str(application.id),
-            "score": 85.0,
+            "score": 8.5,
             "recommendation": "approve",
         },
         headers=auth_headers(evaluator),
@@ -45,7 +45,7 @@ async def test_update_evaluation(client: AsyncClient, evaluator, application):
         "/evaluations",
         json={
             "application_id": str(application.id),
-            "score": 70.0,
+            "score": 7.0,
             "recommendation": "approve",
         },
         headers=auth_headers(evaluator),
@@ -55,10 +55,10 @@ async def test_update_evaluation(client: AsyncClient, evaluator, application):
     r = await client.put(
         f"/evaluations/{eval_id}",
         json={
-            "score": 90.0,
+            "score": 9.0,
             "comment": "Revised upward",
         },
         headers=auth_headers(evaluator),
     )
     assert r.status_code == 200
-    assert r.json()["score"] == 90.0
+    assert r.json()["score"] == 9.0

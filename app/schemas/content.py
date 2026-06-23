@@ -16,6 +16,7 @@ class ContentPageCreate(BaseModel):
 
 
 class ContentPageUpdate(BaseModel):
+    slug: Optional[str] = None
     title: Optional[str] = None
     body: Optional[str] = None
     meta_title: Optional[str] = None
@@ -48,6 +49,7 @@ class NewsArticleCreate(BaseModel):
 
 
 class NewsArticleUpdate(BaseModel):
+    slug: Optional[str] = None
     title: Optional[str] = None
     body: Optional[str] = None
     published_at: Optional[datetime] = None
