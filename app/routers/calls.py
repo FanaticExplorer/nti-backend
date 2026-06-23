@@ -17,11 +17,13 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.database import get_db
-from app.dependencies import require_role
+from app.dependencies import get_current_user_optional, require_role
 from app.models.call import Call
 from app.models.organization import org_members
+from app.models.program import Program
 from app.models.user import User
 from app.schemas.call import CallCreate, CallOut, CallStatusUpdate, CallUpdate
 
@@ -41,23 +43,42 @@ async def list_calls(
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
     status: str | None = Query(None),
+    program_id: uuid.UUID | None = Query(None),
+    program_type: str | None = Query(None),
+    current_user: User | None = Depends(get_current_user_optional),
     db: AsyncSession = Depends(get_db),
 ):
     """
     Return a paginated list of calls.
 
-    Defaults to ``open`` calls if no **status** filter is provided.
+    Non-admin users see only non-draft calls unless a specific status is requested.
 
     **Access**: public (no authentication required)
     """
-    query = select(Call).where(Call.status == (status if status else "open"))
+    query = select(Call).options(selectinload(Call.program), selectinload(Call.organization))
+    count_query_base = select(func.count(Call.id))
+
+    is_admin = current_user and current_user.role in ("nti_admin", "super_admin")
+    if not is_admin and not status:
+        query = query.where(Call.status != "draft")
+        count_query_base = count_query_base.where(Call.status != "draft")
+
+    if status:
+        query = query.where(Call.status == status)
+        count_query_base = count_query_base.where(Call.status == status)
+    if program_id:
+        query = query.where(Call.program_id == program_id)
+        count_query_base = count_query_base.where(Call.program_id == program_id)
+    if program_type:
+        query = query.join(Call.program).where(Program.type == program_type)
+        count_query_base = count_query_base.join(Call.program).where(Program.type == program_type)
+
     query = query.offset(skip).limit(limit)
 
     result = await db.execute(query)
     calls = result.scalars().all()
 
-    count_query = select(func.count(Call.id)).where(Call.status == (status if status else "open"))
-    total = (await db.execute(count_query)).scalar_one()
+    total = (await db.execute(count_query_base)).scalar_one()
 
     return {
         "items": [CallOut.model_validate(c) for c in calls],
@@ -79,7 +100,7 @@ async def get_call(
 
     **Access**: public (no authentication required)
     """
-    result = await db.execute(select(Call).where(Call.id == call_id))
+    result = await db.execute(select(Call).options(selectinload(Call.program), selectinload(Call.organization)).where(Call.id == call_id))
     call = result.scalar_one_or_none()
     if not call:
         raise HTTPException(
@@ -129,6 +150,13 @@ async def create_call(
     db.add(call)
     await db.commit()
     await db.refresh(call)
+
+    # Eagerly load relationships for response serialization
+    result = await db.execute(
+        select(Call).options(selectinload(Call.program), selectinload(Call.organization)).where(Call.id == call.id)
+    )
+    call = result.scalar_one()
+
     return call
 
 
@@ -167,7 +195,11 @@ async def update_call(
         setattr(call, key, value)
     await db.commit()
     await db.refresh(call)
-    return call
+
+    result = await db.execute(
+        select(Call).options(selectinload(Call.program), selectinload(Call.organization)).where(Call.id == call.id)
+    )
+    return result.scalar_one()
 
 
 @router.patch("/{call_id}/status", response_model=CallOut)
@@ -203,4 +235,8 @@ async def change_call_status(
     call.status = body.status
     await db.commit()
     await db.refresh(call)
-    return call
+
+    result = await db.execute(
+        select(Call).options(selectinload(Call.program), selectinload(Call.organization)).where(Call.id == call.id)
+    )
+    return result.scalar_one()
