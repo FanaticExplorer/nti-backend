@@ -1,7 +1,10 @@
 from datetime import datetime
+from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel
+
+from app.schemas.application import ApplicationDetailOut
 
 
 class MentorshipCreate(BaseModel):
@@ -29,5 +32,6 @@ class MentorshipOut(BaseModel):
     mentor_id: UUID
     assigned_at: datetime
     is_active: bool
+    application: Optional[ApplicationDetailOut] = None
 
     model_config = {"from_attributes": True}

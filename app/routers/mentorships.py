@@ -16,10 +16,12 @@ import uuid
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.database import get_db
 from app.dependencies import get_current_user, require_role
 from app.models.application import Application
+from app.models.call import Call
 from app.models.mentorship import Mentorship
 from app.models.mentorship_log import MentorshipLog
 from app.models.user import User
@@ -81,7 +83,18 @@ async def assign_mentor(
     )
     db.add(mentorship)
     await db.commit()
-    await db.refresh(mentorship)
+
+    result = await db.execute(
+        select(Mentorship)
+        .options(
+            selectinload(Mentorship.application).selectinload(Application.call).selectinload(Call.program),
+            selectinload(Mentorship.application).selectinload(Application.call).selectinload(Call.organization),
+            selectinload(Mentorship.application).selectinload(Application.applicant),
+            selectinload(Mentorship.application).selectinload(Application.team),
+        )
+        .where(Mentorship.id == mentorship.id)
+    )
+    mentorship = result.scalar_one()
 
     await write_audit_log(
         db,
@@ -127,7 +140,14 @@ async def get_my_mentorships(
     **Access**: ``mentor`` only
     """
     result = await db.execute(
-        select(Mentorship).where(Mentorship.mentor_id == current_user.id)
+        select(Mentorship)
+        .options(
+            selectinload(Mentorship.application).selectinload(Application.call).selectinload(Call.program),
+            selectinload(Mentorship.application).selectinload(Application.call).selectinload(Call.organization),
+            selectinload(Mentorship.application).selectinload(Application.applicant),
+            selectinload(Mentorship.application).selectinload(Application.team),
+        )
+        .where(Mentorship.mentor_id == current_user.id)
     )
     mentorships = result.scalars().all()
     return {
@@ -150,7 +170,16 @@ async def get_mentorship(
     - The assigned mentor can view their own mentorships
     - All other roles receive a 403
     """
-    result = await db.execute(select(Mentorship).where(Mentorship.id == mentorship_id))
+    result = await db.execute(
+        select(Mentorship)
+        .options(
+            selectinload(Mentorship.application).selectinload(Application.call).selectinload(Call.program),
+            selectinload(Mentorship.application).selectinload(Application.call).selectinload(Call.organization),
+            selectinload(Mentorship.application).selectinload(Application.applicant),
+            selectinload(Mentorship.application).selectinload(Application.team),
+        )
+        .where(Mentorship.id == mentorship_id)
+    )
     mentorship = result.scalar_one_or_none()
     if not mentorship:
         raise HTTPException(
