@@ -44,7 +44,7 @@ grant incubation (Program A) and live practice placements (Program B).
 
 Covers the full application lifecycle — from registration and submission through
 evaluation, onboarding, and project tracking — with JWT-based authentication,
-8 role-based access levels, an audit trail for all sensitive operations, and
+9 role-based access levels, an audit trail for all sensitive operations, and
 async email notifications. Every endpoint includes a detailed description in
 the OpenAPI docs below.
 """,
